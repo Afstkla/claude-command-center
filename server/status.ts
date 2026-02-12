@@ -1,11 +1,12 @@
 import { execFileSync } from 'child_process';
 import { getAllSessions, updateSessionStatus } from './db.js';
+import { notifyWaiting } from './notifier.js';
 
 const TMUX_PREFIX = 'cc-';
 const POLL_INTERVAL = 3000;
 
 /** Capture the last N lines from a tmux pane */
-function capturePaneLines(tmuxName: string, lines = 5): string[] {
+function capturePaneLines(tmuxName: string, lines = 15): string[] {
   try {
     const output = execFileSync('tmux', ['capture-pane', '-t', tmuxName, '-p'], {
       encoding: 'utf-8',
@@ -22,6 +23,10 @@ function detectStatus(lines: string[]): string {
 
   const lastLines = lines.join('\n');
 
+  // Claude asking for permission (check first — "reading/writing" in option text can false-positive as running)
+  if (/Do you want to proceed\?/i.test(lastLines)) return 'waiting';
+  if (/allow|approve|deny|yes.*no/i.test(lastLines)) return 'waiting';
+
   // Claude waiting for input — prompt character visible
   if (/[❯>]\s*$/.test(lastLines)) return 'idle';
 
@@ -29,15 +34,14 @@ function detectStatus(lines: string[]): string {
   if (/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏●∙]/.test(lastLines)) return 'running';
   if (/thinking|processing|reading|writing/i.test(lastLines)) return 'running';
 
-  // Claude asking for permission
-  if (/Do you want to proceed\?/i.test(lastLines)) return 'waiting';
-  if (/allow|approve|deny|yes.*no/i.test(lastLines)) return 'waiting';
-
   // Default to running if we have content
   return 'running';
 }
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
+
+// Track last notified status per session to avoid duplicate notifications
+const lastNotifiedStatus = new Map<string, string>();
 
 /** Start polling tmux sessions for status updates */
 export function startStatusPolling() {
@@ -54,6 +58,11 @@ export function startStatusPolling() {
 
       if (status !== session.status) {
         updateSessionStatus(session.id, status);
+
+        if (status === 'waiting' && lastNotifiedStatus.get(session.id) !== 'waiting') {
+          notifyWaiting(session.id, session.name);
+        }
+        lastNotifiedStatus.set(session.id, status);
       }
     }
   }, POLL_INTERVAL);
