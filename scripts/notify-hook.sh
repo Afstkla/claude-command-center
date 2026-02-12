@@ -31,7 +31,7 @@ PORT="${PORT:-3100}"
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 TOOL_JSON='{}'
 if [[ -n "$TRANSCRIPT_PATH" && -f "$TRANSCRIPT_PATH" ]]; then
-  TOOL_JSON=$(tail -20 "$TRANSCRIPT_PATH" | python3 -c "
+  EXTRACTED=$(tail -50 "$TRANSCRIPT_PATH" | python3 -c "
 import sys, json
 for line in reversed(sys.stdin.readlines()):
     line = line.strip()
@@ -46,13 +46,16 @@ for line in reversed(sys.stdin.readlines()):
                 sys.exit(0)
     except:
         continue
-" 2>/dev/null || echo '{}')
+" 2>/dev/null)
+  if [[ -n "$EXTRACTED" ]] && echo "$EXTRACTED" | jq . >/dev/null 2>&1; then
+    TOOL_JSON="$EXTRACTED"
+  fi
 fi
 
 # POST to Command Center
 curl -s -X POST "http://localhost:${PORT}/api/sessions/${SESSION_ID}/notify?token=${TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "$TOOL_JSON" \
+  -d @- <<< "$TOOL_JSON" \
   >/dev/null 2>&1 &
 
 exit 0
