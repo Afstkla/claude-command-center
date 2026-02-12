@@ -1,0 +1,129 @@
+# Claude Command Center
+
+A web-based command center for managing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI sessions through your browser. Spawn, monitor, and interact with multiple sessions from any device.
+
+Built to run on a home server (e.g. Mac Mini) and accessed remotely over [Tailscale](https://tailscale.com).
+
+## Features
+
+- **Multi-session management** — create, monitor, and kill sessions from a dashboard
+- **Browser-based terminal** — full xterm.js terminal with color, resize, and clickable links
+- **Durable sessions via tmux** — sessions survive server restarts; SSH in and `tmux attach` as fallback
+- **Dual transport** — WebSocket with automatic SSE fallback for slow/unreliable networks
+- **Status detection** — polls tmux pane content to show session state (idle, running, waiting)
+- **Simple auth** — passphrase + signed cookie (designed for use behind Tailscale)
+- **Mobile-friendly** — responsive layout, works on iPhone Safari
+
+## Architecture
+
+```
+Browser (MacBook / iPhone over Tailscale)
+    │
+    ├── HTTP: REST API + SSE fallback
+    └── WebSocket: live terminal
+    │
+Server (Node.js + Express)
+    │
+    ├── SQLite: session metadata
+    ├── node-pty: terminal bridge
+    └── tmux: session backend (durable)
+```
+
+## Prerequisites
+
+- **Node.js** 20+ (tested with 23)
+- **tmux** (`brew install tmux`)
+- **Claude Code** CLI installed and authenticated
+- **Tailscale** (for remote access)
+
+## Setup
+
+```bash
+git clone https://github.com/Afstkla/claude-command-center.git
+cd claude-command-center
+
+# Install dependencies
+npm install
+cd frontend && npm install && cd ..
+
+# Configure
+cp .env.example .env
+# Edit .env — set AUTH_PASSPHRASE and AUTH_SECRET
+```
+
+### Environment variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | `3100` |
+| `AUTH_PASSPHRASE` | Login passphrase | (required) |
+| `AUTH_SECRET` | JWT signing key (min 32 chars) | (required) |
+| `COOKIE_MAX_AGE_HOURS` | Auth cookie expiry | `24` |
+
+## Running
+
+### Development
+
+```bash
+npm run dev
+# Backend: http://localhost:3100
+# Frontend: http://localhost:5173 (proxies API to backend)
+```
+
+### Production
+
+```bash
+npm run build
+npm start
+
+# Or use pm2 for process management:
+npm install -g pm2
+pm2 start "npx tsx server/index.ts" --name command-center --cwd $(pwd)
+pm2 startup  # Auto-start on boot
+pm2 save
+```
+
+## Tailscale setup
+
+1. Install [Tailscale](https://tailscale.com/download) on your server and client devices
+2. Run `tailscale up` on both
+3. Find your server's Tailscale IP: `tailscale ip -4`
+4. Access the command center at `http://<tailscale-ip>:3100`
+
+No HTTPS needed — Tailscale encrypts all traffic via WireGuard. No port forwarding, no public exposure.
+
+### Why Tailscale?
+
+- Zero-config VPN: devices authenticate via your identity provider
+- WireGuard encryption: all traffic is end-to-end encrypted
+- No open ports: your server is never exposed to the public internet
+- Works everywhere: train wifi, coffee shop, mobile data
+
+## Usage
+
+1. Open `http://<tailscale-ip>:3100` and enter your passphrase
+2. Click **New Session** — set a name, working directory, and optionally a custom command (defaults to `claude`)
+3. Click a session card to open the terminal
+4. The terminal auto-selects the best transport: WebSocket on good networks, SSE fallback on slow ones
+
+### Session durability
+
+Sessions run inside tmux. If the server crashes or restarts:
+- Sessions keep running in tmux
+- The server reconnects to them on startup
+- You can always SSH in and run `tmux ls` / `tmux attach -t cc-<id>`
+
+## Tech stack
+
+| Component | Technology |
+|-----------|-----------|
+| Backend | Node.js, Express, TypeScript |
+| Frontend | React 19, Vite, TypeScript |
+| Terminal | xterm.js, node-pty |
+| Session backend | tmux |
+| Database | SQLite (better-sqlite3) |
+| Auth | JWT via jose |
+
+## License
+
+MIT
