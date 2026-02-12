@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Terminal } from './pages/Terminal';
+import { Respond } from './pages/Respond';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [auth, setAuth] = useState<'loading' | 'ok' | 'denied'>('loading');
@@ -23,6 +24,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/respond/:requestId" element={<Respond />} />
         <Route
           path="/"
           element={

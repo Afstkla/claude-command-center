@@ -1,0 +1,20 @@
+{
+  "name": "command-center-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "command-center-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
