@@ -21,6 +21,10 @@ db.exec(`
   )
 `);
 
+// Additive migrations
+try { db.exec(`ALTER TABLE sessions ADD COLUMN worktree_path TEXT`); } catch {}
+try { db.exec(`ALTER TABLE sessions ADD COLUMN repo TEXT`); } catch {}
+
 export interface Session {
   id: string;
   name: string;
@@ -28,6 +32,8 @@ export interface Session {
   status: string;
   created_at: string;
   last_activity: string;
+  worktree_path: string | null;
+  repo: string | null;
 }
 
 const stmts = {
@@ -40,6 +46,9 @@ const stmts = {
     `UPDATE sessions SET status = ?, last_activity = datetime('now') WHERE id = ?`
   ),
   remove: db.prepare('DELETE FROM sessions WHERE id = ?'),
+  setMeta: db.prepare(
+    'UPDATE sessions SET worktree_path = ?, repo = ? WHERE id = ?'
+  ),
 };
 
 export function insertSession(id: string, name: string, cwd: string) {
@@ -60,6 +69,10 @@ export function updateSessionStatus(id: string, status: string) {
 
 export function removeSession(id: string) {
   stmts.remove.run(id);
+}
+
+export function setSessionMeta(id: string, worktreePath?: string, repo?: string) {
+  stmts.setMeta.run(worktreePath ?? null, repo ?? null, id);
 }
 
 export default db;

@@ -1,6 +1,7 @@
 import { useState, useCallback, type FormEvent } from 'react';
 import { DefaultForm, type TemplatePayload } from './templates/DefaultForm';
 import { GitCloneForm } from './templates/GitCloneForm';
+import { WorktreeForm } from './templates/WorktreeForm';
 
 interface Props {
   onClose: () => void;
@@ -10,6 +11,7 @@ interface Props {
 const templates = [
   { id: 'directory', label: 'Directory' },
   { id: 'git-clone', label: 'Git Clone' },
+  { id: 'worktree', label: 'Worktree' },
 ] as const;
 
 type TemplateId = (typeof templates)[number]['id'];
@@ -40,6 +42,9 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
         name,
         cwd: payload.cwd,
         command: payload.command || undefined,
+        worktreePath: payload.worktreePath,
+        initialPrompt: payload.initialPrompt,
+        repo: payload.repo,
       }),
     });
 
@@ -79,6 +84,13 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
 
         {template === 'git-clone' && (
           <GitCloneForm
+            onPayloadChange={handlePayloadChange}
+            onSuggestName={handleSuggestName}
+          />
+        )}
+
+        {template === 'worktree' && (
+          <WorktreeForm
             onPayloadChange={handlePayloadChange}
             onSuggestName={handleSuggestName}
           />
