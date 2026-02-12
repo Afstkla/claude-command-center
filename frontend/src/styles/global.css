@@ -179,6 +179,46 @@ input:focus {
   color: white;
 }
 
+/* Quick Actions */
+
+.quick-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.quick-actions button {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+}
+
+.quick-actions button:first-child {
+  background: #2e7d32;
+}
+.quick-actions button:first-child:hover {
+  background: #388e3c;
+}
+
+.quick-actions button:nth-child(2) {
+  background: var(--border);
+  color: var(--text-dim);
+}
+
+.quick-actions button:nth-child(3) {
+  background: var(--border);
+  color: var(--text-dim);
+}
+
+.quick-actions-input {
+  margin-top: 0.35rem;
+}
+
+.quick-actions-input input {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
+}
+
 /* Dialog */
 
 .dialog-overlay {
