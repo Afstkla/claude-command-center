@@ -16,7 +16,7 @@ export function GitCloneForm({ onPayloadChange, onSuggestName }: Props) {
   const [repoUrl, setRepoUrl] = useState('');
   const [dirName, setDirName] = useState('');
   const [dirNameManual, setDirNameManual] = useState(false);
-  const [parentDir, setParentDir] = useState('~');
+  const [parentDir, setParentDir] = useState('~/Developer');
 
   const effectiveDirName = dirNameManual ? dirName : repoNameFromUrl(repoUrl);
 
