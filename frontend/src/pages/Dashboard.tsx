@@ -32,6 +32,18 @@ export function Dashboard() {
     fetchSessions();
   }
 
+  async function handleQuickAction(id: string, text: string) {
+    await fetch(`/api/sessions/${id}/input`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    // Backend polls status every 3s — retry a few times to catch the change
+    fetchSessions();
+    setTimeout(fetchSessions, 1500);
+    setTimeout(fetchSessions, 4000);
+  }
+
   return (
     <div className="dashboard">
       <header className="dashboard-header">
@@ -45,7 +57,12 @@ export function Dashboard() {
 
       <div className="session-grid">
         {sessions.map((s) => (
-          <SessionCard key={s.id} session={s} onKill={() => handleKill(s.id)} />
+          <SessionCard
+            key={s.id}
+            session={s}
+            onKill={() => handleKill(s.id)}
+            onQuickAction={(text) => handleQuickAction(s.id, text)}
+          />
         ))}
       </div>
 

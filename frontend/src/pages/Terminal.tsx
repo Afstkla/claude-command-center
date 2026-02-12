@@ -19,6 +19,7 @@ export function Terminal() {
     const term = new XTerm({
       cursorBlink: true,
       fontSize: 14,
+      scrollback: 0,
       theme: {
         background: '#1a1a2e',
         foreground: '#e0e0e0',
@@ -43,6 +44,12 @@ export function Terminal() {
       wsConnected = true;
       setStatus('');
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+
+      // Force tmux to repaint by briefly toggling the size
+      setTimeout(() => {
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols + 1, rows: term.rows }));
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      }, 100);
 
       ws.onmessage = (e) => {
         if (e.data instanceof Blob) {

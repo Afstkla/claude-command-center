@@ -30,6 +30,7 @@ function detectStatus(lines: string[]): string {
   if (/thinking|processing|reading|writing/i.test(lastLines)) return 'running';
 
   // Claude asking for permission
+  if (/Do you want to proceed\?/i.test(lastLines)) return 'waiting';
   if (/allow|approve|deny|yes.*no/i.test(lastLines)) return 'waiting';
 
   // Default to running if we have content

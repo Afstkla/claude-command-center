@@ -10,6 +10,7 @@ import { login, authMiddleware, COOKIE_NAME, MAX_AGE_HOURS } from './auth.js';
 import { createSession, listSessions, killSession, getSession } from './sessions.js';
 import { syncSessionsWithTmux } from './sessions.js';
 import { setupTerminalWs, handleTerminalSSE, handleTerminalInput } from './terminal.js';
+import { sendInput } from './input.js';
 import { startStatusPolling } from './status.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -85,6 +86,23 @@ app.delete('/api/sessions/:id', (req, res) => {
   const success = killSession(req.params.id);
   if (!success) {
     res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+// --- Quick input (sends keys to tmux directly, no pty needed) ---
+
+app.post('/api/sessions/:id/input', (req, res) => {
+  const { text } = req.body;
+  if (!text) {
+    res.status(400).json({ error: 'text is required' });
+    return;
+  }
+
+  const success = sendInput(req.params.id, text);
+  if (!success) {
+    res.status(404).json({ error: 'Session not found or dead' });
     return;
   }
   res.json({ ok: true });
