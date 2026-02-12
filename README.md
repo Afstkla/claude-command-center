@@ -113,6 +113,34 @@ Sessions run inside tmux. If the server crashes or restarts:
 - The server reconnects to them on startup
 - You can always SSH in and run `tmux ls` / `tmux attach -t cc-<id>`
 
+## Push notifications
+
+Get notified on your phone when Claude needs tool approval or wants your input. Uses [ntfy](https://ntfy.sh) for push delivery.
+
+### Setup
+
+Add ntfy config to your `.env`:
+
+```bash
+NTFY_ENABLED=true
+NTFY_URL=https://ntfy.sh        # or your self-hosted instance
+NTFY_TOPIC=your-secret-topic
+NTFY_AUTH_TOKEN=your-token       # optional, for private topics
+BASE_URL=http://<tailscale-ip>:3100
+```
+
+Then run the setup scripts:
+
+```bash
+# MCP server — gives Claude notify_user/ask_user tools
+./scripts/setup-mcp.sh
+
+# Notification hook — alerts you on tool approval prompts
+./scripts/setup-hooks.sh
+```
+
+Both scripts configure Claude Code at the **user level** (`~/.claude.json` and `~/.claude/settings.json`), so notifications work across all sessions and projects. Restart any running Claude Code sessions to pick up the changes.
+
 ## Tech stack
 
 | Component | Technology |
