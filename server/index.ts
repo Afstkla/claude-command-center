@@ -13,6 +13,7 @@ import { setupTerminalWs, handleTerminalSSE, handleTerminalInput } from './termi
 import { sendInput } from './input.js';
 import { notifyWaiting } from './notifier.js';
 import { startStatusPolling } from './status.js';
+import { createRequest, getRequest, setResponse, getResponse } from './mcp-responses.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3100', 10);
@@ -39,6 +40,77 @@ app.post('/api/sessions/:id/input', (req, res, next) => {
     return;
   }
   next();
+});
+
+// --- MCP response endpoints (token auth, before cookie auth middleware) ---
+
+// MCP server polls this to check for user responses
+app.get('/api/mcp/responses/:requestId', (req, res) => {
+  const token = req.query.token as string;
+  if (!token || !process.env.NTFY_AUTH_TOKEN || token !== process.env.NTFY_AUTH_TOKEN) {
+    res.status(401).json({ error: 'Invalid token' });
+    return;
+  }
+
+  const response = getResponse(req.params.requestId);
+  if (response === undefined) {
+    res.status(204).end();
+    return;
+  }
+  res.json({ response });
+});
+
+// ntfy action buttons POST here with a pre-selected response
+app.post('/api/mcp/respond', (req, res, next) => {
+  const token = req.query.token as string;
+  if (token && process.env.NTFY_AUTH_TOKEN && token === process.env.NTFY_AUTH_TOKEN) {
+    const { requestId, response } = req.body;
+    if (!requestId || !response) {
+      res.status(400).json({ error: 'requestId and response are required' });
+      return;
+    }
+    const ok = setResponse(requestId, response);
+    if (!ok) {
+      res.status(404).json({ error: 'Request not found or expired' });
+      return;
+    }
+    res.json({ ok: true });
+    return;
+  }
+  next(); // Fall through to cookie-authed version below
+});
+
+// Store a pending ask_user request (called by MCP server)
+app.post('/api/mcp/requests', (req, res) => {
+  const token = req.query.token as string;
+  if (!token || !process.env.NTFY_AUTH_TOKEN || token !== process.env.NTFY_AUTH_TOKEN) {
+    res.status(401).json({ error: 'Invalid token' });
+    return;
+  }
+
+  const { requestId, sessionId, question, options, allowText } = req.body;
+  if (!requestId || !question) {
+    res.status(400).json({ error: 'requestId and question are required' });
+    return;
+  }
+  createRequest(requestId, sessionId || '', question, options || [], allowText ?? true);
+  res.status(201).json({ ok: true });
+});
+
+// Get request details (for the response web page — token or cookie auth)
+app.get('/api/mcp/requests/:requestId', (req, res, next) => {
+  const token = req.query.token as string;
+  if (token && process.env.NTFY_AUTH_TOKEN && token === process.env.NTFY_AUTH_TOKEN) {
+    const request = getRequest(req.params.requestId);
+    if (!request) {
+      res.status(404).json({ error: 'Request not found or expired' });
+      return;
+    }
+    const { response, createdAt, ...safe } = request;
+    res.json(safe);
+    return;
+  }
+  next(); // Fall through to cookie-authed version below
 });
 
 // Hook-triggered notification endpoint (token auth, called by notify-hook.sh)
@@ -88,6 +160,32 @@ app.post('/api/auth/logout', (_req, res) => {
 });
 
 app.get('/api/auth/check', (_req, res) => {
+  res.json({ ok: true });
+});
+
+// --- MCP (cookie-authed, for web response page) ---
+
+app.get('/api/mcp/requests/:requestId', (req, res) => {
+  const request = getRequest(req.params.requestId);
+  if (!request) {
+    res.status(404).json({ error: 'Request not found or expired' });
+    return;
+  }
+  const { response, createdAt, ...safe } = request;
+  res.json(safe);
+});
+
+app.post('/api/mcp/respond', (req, res) => {
+  const { requestId, response } = req.body;
+  if (!requestId || !response) {
+    res.status(400).json({ error: 'requestId and response are required' });
+    return;
+  }
+  const ok = setResponse(requestId, response);
+  if (!ok) {
+    res.status(404).json({ error: 'Request not found or expired' });
+    return;
+  }
   res.json({ ok: true });
 });
 

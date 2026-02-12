@@ -1,6 +1,10 @@
 #!/bin/bash
 # Claude Code Notification hook — sends tool permission details to Command Center
 # Configure in .claude/settings.json under hooks.Notification
+#
+# The Notification hook receives: message, title, notification_type,
+# transcript_path, session_id, cwd, permission_mode — but NOT tool details.
+# We extract tool_name/tool_input from the transcript file.
 
 # Read hook JSON from stdin
 INPUT=$(cat)
@@ -23,14 +27,32 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 PORT="${PORT:-3100}"
 
-# Extract tool info from the hook JSON
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
-TOOL_INPUT=$(echo "$INPUT" | jq -c '.tool_input // {}')
+# Extract tool info from the transcript (last tool_use block in the last assistant message)
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
+TOOL_JSON='{}'
+if [[ -n "$TRANSCRIPT_PATH" && -f "$TRANSCRIPT_PATH" ]]; then
+  TOOL_JSON=$(tail -20 "$TRANSCRIPT_PATH" | python3 -c "
+import sys, json
+for line in reversed(sys.stdin.readlines()):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        entry = json.loads(line)
+        content = entry.get('message', {}).get('content', [])
+        for block in reversed(content):
+            if block.get('type') == 'tool_use':
+                json.dump({'tool_name': block['name'], 'tool_input': block.get('input', {})}, sys.stdout)
+                sys.exit(0)
+    except:
+        continue
+" 2>/dev/null || echo '{}')
+fi
 
 # POST to Command Center
 curl -s -X POST "http://localhost:${PORT}/api/sessions/${SESSION_ID}/notify?token=${TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "{\"tool_name\":\"$TOOL_NAME\",\"tool_input\":$TOOL_INPUT}" \
+  -d "$TOOL_JSON" \
   >/dev/null 2>&1 &
 
 exit 0
