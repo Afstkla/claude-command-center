@@ -1,44 +1,33 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, useCallback, type FormEvent } from 'react';
+import { DefaultForm, type TemplatePayload } from './templates/DefaultForm';
+import { GitCloneForm } from './templates/GitCloneForm';
 
 interface Props {
   onClose: () => void;
   onCreated: () => void;
 }
 
-export function NewSessionDialog({ onClose, onCreated }: Props) {
-  const [name, setName] = useState('');
-  const [cwd, setCwd] = useState('~');
-  const [command, setCommand] = useState('claude');
-  const [error, setError] = useState('');
-  const [dirs, setDirs] = useState<string[]>([]);
-  const [resolvedPath, setResolvedPath] = useState('');
-  const [showBrowser, setShowBrowser] = useState(false);
+const templates = [
+  { id: 'directory', label: 'Directory' },
+  { id: 'git-clone', label: 'Git Clone' },
+] as const;
 
-  const browse = useCallback(async (path: string) => {
-    try {
-      const res = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setDirs(data.dirs);
-        setResolvedPath(data.path);
-      }
-    } catch { /* ignore */ }
+type TemplateId = (typeof templates)[number]['id'];
+
+export function NewSessionDialog({ onClose, onCreated }: Props) {
+  const [template, setTemplate] = useState<TemplateId>('directory');
+  const [name, setName] = useState('');
+  const [nameManual, setNameManual] = useState(false);
+  const [payload, setPayload] = useState<TemplatePayload>({ cwd: '~', command: 'claude' });
+  const [error, setError] = useState('');
+
+  const handlePayloadChange = useCallback((p: TemplatePayload) => {
+    setPayload(p);
   }, []);
 
-  useEffect(() => {
-    browse(cwd);
-  }, [cwd, browse]);
-
-  function navigateTo(dir: string) {
-    const newPath = resolvedPath + '/' + dir;
-    setCwd(newPath);
-    setShowBrowser(true);
-  }
-
-  function navigateUp() {
-    const parent = resolvedPath.replace(/\/[^/]+\/?$/, '') || '/';
-    setCwd(parent);
-  }
+  const handleSuggestName = useCallback((suggested: string) => {
+    if (!nameManual) setName(suggested);
+  }, [nameManual]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -49,8 +38,8 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name,
-        cwd,
-        command: command || undefined,
+        cwd: payload.cwd,
+        command: payload.command || undefined,
       }),
     });
 
@@ -71,67 +60,43 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
       >
         <h2>New Session</h2>
 
+        <div className="template-selector">
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`template-btn${template === t.id ? ' active' : ''}`}
+              onClick={() => setTemplate(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         <label>
           Name
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameManual(true);
+            }}
             placeholder="my-project"
             required
-            autoFocus
+            autoFocus={template === 'directory'}
           />
         </label>
 
-        <label>
-          Working Directory
-          <div className="dir-input-row">
-            <input
-              value={cwd}
-              onChange={(e) => {
-                setCwd(e.target.value);
-                setShowBrowser(true);
-              }}
-              onFocus={() => setShowBrowser(true)}
-              placeholder="/path/to/project"
-              required
-            />
-            <button
-              type="button"
-              className="browse-btn"
-              onClick={() => setShowBrowser(!showBrowser)}
-            >
-              {showBrowser ? 'Hide' : 'Browse'}
-            </button>
-          </div>
-        </label>
-
-        {showBrowser && (
-          <div className="dir-browser">
-            <div className="dir-resolved">
-              {resolvedPath}
-            </div>
-            <div className="dir-list">
-              <div className="dir-entry" onClick={navigateUp}>..</div>
-              {dirs.map((d) => (
-                <div key={d} className="dir-entry" onClick={() => navigateTo(d)}>
-                  {d}/
-                </div>
-              ))}
-              {dirs.length === 0 && (
-                <div className="dir-empty">No subdirectories</div>
-              )}
-            </div>
-          </div>
+        {template === 'directory' && (
+          <DefaultForm onPayloadChange={handlePayloadChange} />
         )}
 
-        <label>
-          Command
-          <input
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            placeholder="claude"
+        {template === 'git-clone' && (
+          <GitCloneForm
+            onPayloadChange={handlePayloadChange}
+            onSuggestName={handleSuggestName}
           />
-        </label>
+        )}
 
         {error && <p className="error">{error}</p>}
 
