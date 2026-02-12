@@ -38,7 +38,10 @@ export function Dashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
+    // Backend polls status every 3s — retry a few times to catch the change
     fetchSessions();
+    setTimeout(fetchSessions, 1500);
+    setTimeout(fetchSessions, 4000);
   }
 
   return (
