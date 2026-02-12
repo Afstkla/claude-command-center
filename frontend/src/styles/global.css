@@ -205,6 +205,36 @@ input:focus {
   font-size: 1.125rem;
 }
 
+/* Template selector */
+
+.template-selector {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 0.25rem;
+}
+
+.template-btn {
+  flex: 1;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.template-btn:hover {
+  color: var(--text);
+  background: var(--border);
+}
+
+.template-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
 .dialog label {
   display: flex;
   flex-direction: column;
