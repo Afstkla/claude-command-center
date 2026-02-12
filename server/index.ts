@@ -21,10 +21,21 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Token auth for ntfy action buttons (before cookie auth middleware)
-app.post('/api/terminal/:id/input', (req, res, next) => {
+app.post('/api/sessions/:id/input', (req, res, next) => {
   const token = req.query.token as string;
   if (token && process.env.NTFY_AUTH_TOKEN && token === process.env.NTFY_AUTH_TOKEN) {
-    return handleTerminalInput(req, res);
+    const { text } = req.body;
+    if (!text) {
+      res.status(400).json({ error: 'text is required' });
+      return;
+    }
+    const success = sendInput(req.params.id, text);
+    if (!success) {
+      res.status(404).json({ error: 'Session not found or dead' });
+      return;
+    }
+    res.json({ ok: true });
+    return;
   }
   next();
 });

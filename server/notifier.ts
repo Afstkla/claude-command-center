@@ -11,10 +11,10 @@ export async function notifyWaiting(sessionId: string, sessionName: string) {
   const actions: string[] = [];
 
   if (BASE_URL) {
-    const inputUrl = `${BASE_URL}/api/terminal/${sessionId}/input?token=${NTFY_AUTH_TOKEN}`;
+    const inputUrl = `${BASE_URL}/api/sessions/${sessionId}/input?token=${NTFY_AUTH_TOKEN}`;
     actions.push(
-      `http, Yes, ${inputUrl}, body='{"data":"y\\n"}', headers.Content-Type=application/json`,
-      `http, Continue, ${inputUrl}, body='{"data":"\\n"}', headers.Content-Type=application/json`,
+      `http, Yes, ${inputUrl}, body='{"text":"y"}', headers.Content-Type=application/json`,
+      `http, Continue, ${inputUrl}, body='{"text":""}', headers.Content-Type=application/json`,
       `view, Open, ${BASE_URL}/session/${sessionId}`,
     );
   }
