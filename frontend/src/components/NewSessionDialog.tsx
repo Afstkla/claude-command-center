@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 
 interface Props {
   onClose: () => void;
@@ -10,6 +10,35 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
   const [cwd, setCwd] = useState('~');
   const [command, setCommand] = useState('claude');
   const [error, setError] = useState('');
+  const [dirs, setDirs] = useState<string[]>([]);
+  const [resolvedPath, setResolvedPath] = useState('');
+  const [showBrowser, setShowBrowser] = useState(false);
+
+  const browse = useCallback(async (path: string) => {
+    try {
+      const res = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDirs(data.dirs);
+        setResolvedPath(data.path);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    browse(cwd);
+  }, [cwd, browse]);
+
+  function navigateTo(dir: string) {
+    const newPath = resolvedPath + '/' + dir;
+    setCwd(newPath);
+    setShowBrowser(true);
+  }
+
+  function navigateUp() {
+    const parent = resolvedPath.replace(/\/[^/]+\/?$/, '') || '/';
+    setCwd(parent);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -55,13 +84,45 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
 
         <label>
           Working Directory
-          <input
-            value={cwd}
-            onChange={(e) => setCwd(e.target.value)}
-            placeholder="/path/to/project"
-            required
-          />
+          <div className="dir-input-row">
+            <input
+              value={cwd}
+              onChange={(e) => {
+                setCwd(e.target.value);
+                setShowBrowser(true);
+              }}
+              onFocus={() => setShowBrowser(true)}
+              placeholder="/path/to/project"
+              required
+            />
+            <button
+              type="button"
+              className="browse-btn"
+              onClick={() => setShowBrowser(!showBrowser)}
+            >
+              {showBrowser ? 'Hide' : 'Browse'}
+            </button>
+          </div>
         </label>
+
+        {showBrowser && (
+          <div className="dir-browser">
+            <div className="dir-resolved">
+              {resolvedPath}
+            </div>
+            <div className="dir-list">
+              <div className="dir-entry" onClick={navigateUp}>..</div>
+              {dirs.map((d) => (
+                <div key={d} className="dir-entry" onClick={() => navigateTo(d)}>
+                  {d}/
+                </div>
+              ))}
+              {dirs.length === 0 && (
+                <div className="dir-empty">No subdirectories</div>
+              )}
+            </div>
+          </div>
+        )}
 
         <label>
           Command
