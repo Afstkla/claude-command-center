@@ -45,6 +45,12 @@ export function Terminal() {
       setStatus('');
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
 
+      // Force tmux to repaint by briefly toggling the size
+      setTimeout(() => {
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols + 1, rows: term.rows }));
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      }, 100);
+
       ws.onmessage = (e) => {
         if (e.data instanceof Blob) {
           e.data.text().then((text) => term.write(text));
