@@ -6,7 +6,7 @@ const TMUX_PREFIX = 'cc-';
 const POLL_INTERVAL = 3000;
 
 /** Capture the last N lines from a tmux pane */
-function capturePaneLines(tmuxName: string, lines = 5): string[] {
+function capturePaneLines(tmuxName: string, lines = 15): string[] {
   try {
     const output = execFileSync('tmux', ['capture-pane', '-t', tmuxName, '-p'], {
       encoding: 'utf-8',
@@ -23,16 +23,16 @@ function detectStatus(lines: string[]): string {
 
   const lastLines = lines.join('\n');
 
+  // Claude asking for permission (check first — "reading/writing" in option text can false-positive as running)
+  if (/Do you want to proceed\?/i.test(lastLines)) return 'waiting';
+  if (/allow|approve|deny|yes.*no/i.test(lastLines)) return 'waiting';
+
   // Claude waiting for input — prompt character visible
   if (/[❯>]\s*$/.test(lastLines)) return 'idle';
 
   // Claude actively processing
   if (/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏●∙]/.test(lastLines)) return 'running';
   if (/thinking|processing|reading|writing/i.test(lastLines)) return 'running';
-
-  // Claude asking for permission
-  if (/Do you want to proceed\?/i.test(lastLines)) return 'waiting';
-  if (/allow|approve|deny|yes.*no/i.test(lastLines)) return 'waiting';
 
   // Default to running if we have content
   return 'running';

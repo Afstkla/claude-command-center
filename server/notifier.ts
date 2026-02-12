@@ -14,7 +14,7 @@ export async function notifyWaiting(sessionId: string, sessionName: string) {
     const inputUrl = `${BASE_URL}/api/sessions/${sessionId}/input?token=${NTFY_AUTH_TOKEN}`;
     actions.push(
       `http, Yes, ${inputUrl}, body='{"text":"y"}', headers.Content-Type=application/json`,
-      `http, Continue, ${inputUrl}, body='{"text":""}', headers.Content-Type=application/json`,
+      `http, No, ${inputUrl}, body='{"text":"n"}', headers.Content-Type=application/json`,
       `view, Open, ${BASE_URL}/session/${sessionId}`,
     );
   }
