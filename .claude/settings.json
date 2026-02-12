@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/notify-hook.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

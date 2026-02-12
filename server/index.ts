@@ -11,6 +11,7 @@ import { createSession, listSessions, killSession, getSession } from './sessions
 import { syncSessionsWithTmux } from './sessions.js';
 import { setupTerminalWs, handleTerminalSSE, handleTerminalInput } from './terminal.js';
 import { sendInput } from './input.js';
+import { notifyWaiting } from './notifier.js';
 import { startStatusPolling } from './status.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,6 +39,25 @@ app.post('/api/sessions/:id/input', (req, res, next) => {
     return;
   }
   next();
+});
+
+// Hook-triggered notification endpoint (token auth, called by notify-hook.sh)
+app.post('/api/sessions/:id/notify', (req, res) => {
+  const token = req.query.token as string;
+  if (!token || !process.env.NTFY_AUTH_TOKEN || token !== process.env.NTFY_AUTH_TOKEN) {
+    res.status(401).json({ error: 'Invalid token' });
+    return;
+  }
+
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+
+  const { tool_name, tool_input } = req.body;
+  notifyWaiting(session.id, session.name, { tool_name, tool_input });
+  res.json({ ok: true });
 });
 
 // Auth middleware for API routes
