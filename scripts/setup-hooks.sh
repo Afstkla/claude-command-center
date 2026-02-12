@@ -6,11 +6,11 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HOOK_SCRIPT="$SCRIPT_DIR/notify-hook.sh"
+HOOK_SCRIPT="$SCRIPT_DIR/notify-hook.py"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 
 if [[ ! -f "$HOOK_SCRIPT" ]]; then
-  echo "Error: notify-hook.sh not found at $HOOK_SCRIPT"
+  echo "Error: notify-hook.py not found at $HOOK_SCRIPT"
   exit 1
 fi
 
@@ -26,21 +26,18 @@ if [[ -f "$SETTINGS_FILE" ]]; then
     if (!config.hooks.Notification) config.hooks.Notification = [];
 
     const hookCommand = '$HOOK_SCRIPT';
-    const existing = config.hooks.Notification.find(
-      n => n.matcher === 'permission_prompt' &&
-           n.hooks?.some(h => h.command.includes('notify-hook.sh'))
+
+    // Remove any existing notify-hook entries (both .sh and .py)
+    config.hooks.Notification = config.hooks.Notification.filter(
+      n => !(n.matcher === 'permission_prompt' &&
+             n.hooks?.some(h => h.command.includes('notify-hook')))
     );
 
-    if (existing) {
-      existing.hooks = [{ type: 'command', command: hookCommand }];
-      console.log('Updated existing notification hook.');
-    } else {
-      config.hooks.Notification.push({
-        matcher: 'permission_prompt',
-        hooks: [{ type: 'command', command: hookCommand }],
-      });
-      console.log('Added notification hook.');
-    }
+    config.hooks.Notification.push({
+      matcher: 'permission_prompt',
+      hooks: [{ type: 'command', command: hookCommand }],
+    });
+    console.log('Configured notification hook.');
 
     fs.writeFileSync('$SETTINGS_FILE', JSON.stringify(config, null, 2) + '\n');
   "
