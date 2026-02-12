@@ -6,6 +6,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 
 const WS_TIMEOUT = 5000; // Fallback to SSE after 5s
+const RECONNECT_DELAYS = [1000, 2000, 4000]; // Backoff: 1s, 2s, 4s then stop
 
 export function Terminal() {
   const { id } = useParams<{ id: string }>();
@@ -33,67 +34,95 @@ export function Terminal() {
     term.open(termRef.current);
     fitAddon.fit();
 
-    let cleanup: (() => void) | null = null;
-    let wsConnected = false;
+    let disposed = false;
+    let activeWs: WebSocket | null = null;
+    let handleResize: (() => void) | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let dataDisposable: { dispose(): void } | null = null;
 
-    // --- Try WebSocket first ---
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${location.host}/ws/terminal/${id}`);
+    function connectWs(attempt = 0) {
+      if (disposed) return;
 
-    ws.onopen = () => {
-      wsConnected = true;
-      setStatus('');
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${location.host}/ws/terminal/${id}`);
+      activeWs = ws;
 
-      // Force tmux to repaint by briefly toggling the size
-      setTimeout(() => {
-        ws.send(JSON.stringify({ type: 'resize', cols: term.cols + 1, rows: term.rows }));
+      const fallbackTimer = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          ws.close();
+          setStatus('WS slow, using HTTP fallback...');
+          startSSE(id!, term, fitAddon, setStatus);
+        }
+      }, WS_TIMEOUT);
+
+      ws.onopen = () => {
+        clearTimeout(fallbackTimer);
+        setStatus('');
+        attempt = 0;
         ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-      }, 100);
 
-      ws.onmessage = (e) => {
-        if (e.data instanceof Blob) {
-          e.data.text().then((text) => term.write(text));
-        } else {
-          term.write(e.data);
+        // Force tmux to repaint by briefly toggling the size
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'resize', cols: term.cols + 1, rows: term.rows }));
+            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          }
+        }, 100);
+
+        ws.onmessage = (e) => {
+          if (e.data instanceof Blob) {
+            e.data.text().then((text) => term.write(text));
+          } else {
+            term.write(e.data);
+          }
+        };
+
+        // Clean up previous input handler before adding new one
+        dataDisposable?.dispose();
+        dataDisposable = term.onData((data) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'data', data }));
+          }
+        });
+
+        if (!handleResize) {
+          handleResize = () => {
+            fitAddon.fit();
+            if (activeWs?.readyState === WebSocket.OPEN) {
+              activeWs.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+            }
+          };
+          window.addEventListener('resize', handleResize);
         }
       };
 
       ws.onclose = () => {
-        term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
-        setStatus('Disconnected');
-      };
+        clearTimeout(fallbackTimer);
+        if (disposed) return;
 
-      term.onData((data) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'data', data }));
-        }
-      });
-
-      const handleResize = () => {
-        fitAddon.fit();
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        if (attempt < RECONNECT_DELAYS.length) {
+          const delay = RECONNECT_DELAYS[attempt];
+          setStatus(`Reconnecting in ${delay / 1000}s...`);
+          reconnectTimer = setTimeout(() => connectWs(attempt + 1), delay);
+        } else {
+          term.write('\r\n\x1b[31m[Connection lost]\x1b[0m\r\n');
+          setStatus('Disconnected');
         }
       };
-      window.addEventListener('resize', handleResize);
-      cleanup = () => {
-        window.removeEventListener('resize', handleResize);
-        ws.close();
-      };
-    };
 
-    // --- Fallback to SSE after timeout ---
-    const fallbackTimer = setTimeout(() => {
-      if (wsConnected) return;
-      ws.close();
-      setStatus('WS slow, using HTTP fallback...');
-      startSSE(id, term, fitAddon, setStatus, (fn) => { cleanup = fn; });
-    }, WS_TIMEOUT);
+      ws.onerror = () => {
+        // onclose will fire after this, which handles reconnect
+      };
+    }
+
+    connectWs();
 
     return () => {
-      clearTimeout(fallbackTimer);
-      cleanup?.();
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (handleResize) window.removeEventListener('resize', handleResize);
+      dataDisposable?.dispose();
+      activeWs?.close();
       term.dispose();
     };
   }, [id]);
@@ -115,7 +144,6 @@ function startSSE(
   term: XTerm,
   fitAddon: FitAddon,
   setStatus: (s: string) => void,
-  setCleanup: (fn: () => void) => void,
 ) {
   const cols = term.cols;
   const rows = term.rows;
@@ -126,7 +154,6 @@ function startSSE(
   };
 
   evtSource.onmessage = (e) => {
-    // Data is base64-encoded
     const text = atob(e.data);
     term.write(text);
   };
@@ -141,7 +168,6 @@ function startSSE(
     setStatus('Connection lost, retrying...');
   };
 
-  // Input: POST each keystroke
   term.onData((data) => {
     fetch(`/api/terminal/${id}/input`, {
       method: 'POST',
@@ -150,7 +176,6 @@ function startSSE(
     });
   });
 
-  // Resize: POST on window resize
   const handleResize = () => {
     fitAddon.fit();
     fetch(`/api/terminal/${id}/input`, {
@@ -160,9 +185,4 @@ function startSSE(
     });
   };
   window.addEventListener('resize', handleResize);
-
-  setCleanup(() => {
-    window.removeEventListener('resize', handleResize);
-    evtSource.close();
-  });
 }
