@@ -4,15 +4,43 @@ A web-based command center for managing [Claude Code](https://docs.anthropic.com
 
 Built to run on a home server (e.g. Mac Mini) and accessed remotely over [Tailscale](https://tailscale.com).
 
+![Dashboard](docs/screenshots/dashboard.png)
+
 ## Features
 
 - **Multi-session management** — create, monitor, and kill sessions from a dashboard
 - **Browser-based terminal** — full xterm.js terminal with color, resize, and clickable links
+- **Git worktree workflow** — clone repos, create feature worktrees, and assign tasks to Claude
+- **Dashboard grouping** — sessions are grouped by repository for easy navigation
 - **Durable sessions via tmux** — sessions survive server restarts; SSH in and `tmux attach` as fallback
 - **Dual transport** — WebSocket with automatic SSE fallback for slow/unreliable networks
 - **Status detection** — polls tmux pane content to show session state (idle, running, waiting)
+- **Quick actions** — approve, reject, or send custom input to sessions without opening the terminal
+- **Push notifications** — get notified on your phone when Claude needs input (via ntfy)
 - **Simple auth** — passphrase + signed cookie (designed for use behind Tailscale)
 - **Mobile-friendly** — responsive layout, works on iPhone Safari
+
+## Screenshots
+
+### Terminal
+
+Click a session card to open a full browser-based terminal powered by xterm.js.
+
+![Terminal](docs/screenshots/terminal.png)
+
+### Session templates
+
+Create sessions in three ways:
+
+**Directory** — point Claude at any directory on your server.
+
+**Git Clone** — clone a repo into a worktree-friendly structure (`repo/repo-main/`) and start Claude in it.
+
+![Git Clone](docs/screenshots/new-session-git-clone.png)
+
+**Worktree** — select a previously cloned repo, name a feature branch, and optionally describe the task. Claude starts in a new git worktree and receives your task description as its initial prompt.
+
+![Worktree](docs/screenshots/new-session-worktree.png)
 
 ## Architecture
 
@@ -102,9 +130,23 @@ No HTTPS needed — Tailscale encrypts all traffic via WireGuard. No port forwar
 ## Usage
 
 1. Open `http://<tailscale-ip>:3100` and enter your passphrase
-2. Click **New Session** — set a name, working directory, and optionally a custom command (defaults to `claude`)
+2. Click **New Session** and choose a template:
+   - **Directory** — pick a folder and start Claude in it
+   - **Git Clone** — clone a repo (creates `repo/repo-main/` structure for worktree support)
+   - **Worktree** — create a feature branch worktree from an existing repo, with an optional task prompt
 3. Click a session card to open the terminal
-4. The terminal auto-selects the best transport: WebSocket on good networks, SSE fallback on slow ones
+4. Use quick action buttons on session cards to approve, reject, or send input without opening the terminal
+
+### Git worktree workflow
+
+The worktree workflow lets you run multiple Claude sessions on the same repo without conflicts:
+
+1. **Clone a repo** using the Git Clone template — this creates a `repo/repo-main/` directory structure
+2. **Create worktrees** using the Worktree template — each gets its own branch (`feat/<name>`) and directory
+3. **Assign tasks** via the Task Description field — Claude receives it as its first prompt after startup
+4. **Clean up** — killing a worktree session automatically removes the git worktree
+
+Sessions from the same repo are grouped together on the dashboard.
 
 ### Session durability
 
