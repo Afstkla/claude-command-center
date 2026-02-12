@@ -213,6 +213,66 @@ input:focus {
   color: var(--text-dim);
 }
 
+/* Directory browser */
+
+.dir-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dir-input-row input {
+  flex: 1;
+}
+
+.browse-btn {
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--border);
+  white-space: nowrap;
+}
+
+.dir-browser {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: -0.5rem;
+}
+
+.dir-resolved {
+  font-size: 0.7rem;
+  font-family: monospace;
+  color: var(--text-dim);
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dir-list {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.dir-entry {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  font-family: monospace;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.dir-entry:hover {
+  background: var(--border);
+}
+
+.dir-empty {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
 .dialog-actions {
   display: flex;
   gap: 0.5rem;

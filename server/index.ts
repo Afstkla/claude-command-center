@@ -2,7 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
-import { join, dirname } from 'path';
+import { readdirSync, statSync } from 'fs';
+import { join, dirname, resolve } from 'path';
+import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 import { login, authMiddleware, COOKIE_NAME, MAX_AGE_HOURS } from './auth.js';
 import { createSession, listSessions, killSession, getSession } from './sessions.js';
@@ -86,6 +88,27 @@ app.delete('/api/sessions/:id', (req, res) => {
     return;
   }
   res.json({ ok: true });
+});
+
+// --- Directory browser ---
+
+app.get('/api/browse', (req, res) => {
+  const rawPath = (req.query.path as string) || '~';
+  const resolved = rawPath.startsWith('~')
+    ? join(homedir(), rawPath.slice(1))
+    : resolve(rawPath);
+
+  try {
+    const entries = readdirSync(resolved, { withFileTypes: true });
+    const dirs = entries
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+      .map((e) => e.name)
+      .sort();
+
+    res.json({ path: resolved, dirs });
+  } catch {
+    res.json({ path: resolved, dirs: [] });
+  }
 });
 
 // --- Terminal SSE fallback (for slow networks where WS upgrade stalls) ---
