@@ -1,5 +1,6 @@
 import { execFileSync } from 'child_process';
 import { getAllSessions, updateSessionStatus } from './db.js';
+import { notifyWaiting } from './notifier.js';
 
 const TMUX_PREFIX = 'cc-';
 const POLL_INTERVAL = 3000;
@@ -39,6 +40,9 @@ function detectStatus(lines: string[]): string {
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
+// Track last notified status per session to avoid duplicate notifications
+const lastNotifiedStatus = new Map<string, string>();
+
 /** Start polling tmux sessions for status updates */
 export function startStatusPolling() {
   if (intervalId) return;
@@ -54,6 +58,11 @@ export function startStatusPolling() {
 
       if (status !== session.status) {
         updateSessionStatus(session.id, status);
+
+        if (status === 'waiting' && lastNotifiedStatus.get(session.id) !== 'waiting') {
+          notifyWaiting(session.id, session.name);
+        }
+        lastNotifiedStatus.set(session.id, status);
       }
     }
   }, POLL_INTERVAL);

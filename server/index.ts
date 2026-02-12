@@ -20,6 +20,15 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
+// Token auth for ntfy action buttons (before cookie auth middleware)
+app.post('/api/terminal/:id/input', (req, res, next) => {
+  const token = req.query.token as string;
+  if (token && process.env.NTFY_AUTH_TOKEN && token === process.env.NTFY_AUTH_TOKEN) {
+    return handleTerminalInput(req, res);
+  }
+  next();
+});
+
 // Auth middleware for API routes
 app.use('/api', authMiddleware);
 
