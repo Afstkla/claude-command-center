@@ -73,6 +73,17 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
           ))}
         </div>
 
+        {template === 'directory' && (
+          <DefaultForm onPayloadChange={handlePayloadChange} />
+        )}
+
+        {template === 'git-clone' && (
+          <GitCloneForm
+            onPayloadChange={handlePayloadChange}
+            onSuggestName={handleSuggestName}
+          />
+        )}
+
         <label>
           Name
           <input
@@ -86,17 +97,6 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
             autoFocus={template === 'directory'}
           />
         </label>
-
-        {template === 'directory' && (
-          <DefaultForm onPayloadChange={handlePayloadChange} />
-        )}
-
-        {template === 'git-clone' && (
-          <GitCloneForm
-            onPayloadChange={handlePayloadChange}
-            onSuggestName={handleSuggestName}
-          />
-        )}
 
         {error && <p className="error">{error}</p>}
 
