@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
-import { readdirSync, statSync } from 'fs';
+import { readdirSync, statSync, existsSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
@@ -205,7 +205,7 @@ app.get('/api/sessions/:id', (req, res) => {
 });
 
 app.post('/api/sessions', (req, res) => {
-  const { name, cwd, command } = req.body;
+  const { name, cwd, command, worktreePath, initialPrompt, repo } = req.body;
 
   if (!name || !cwd) {
     res.status(400).json({ error: 'name and cwd are required' });
@@ -213,7 +213,7 @@ app.post('/api/sessions', (req, res) => {
   }
 
   try {
-    const session = createSession(name, cwd, command);
+    const session = createSession(name, cwd, command, { worktreePath, initialPrompt, repo });
     res.status(201).json(session);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -227,6 +227,29 @@ app.delete('/api/sessions/:id', (req, res) => {
     return;
   }
   res.json({ ok: true });
+});
+
+// --- Repos (scan ~/Developer for worktree-structured repos) ---
+
+app.get('/api/repos', (_req, res) => {
+  const devDir = join(homedir(), 'Developer');
+  const repos: { name: string; path: string; mainPath: string }[] = [];
+
+  try {
+    const entries = readdirSync(devDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const repoDir = join(devDir, entry.name);
+      const mainDir = join(repoDir, `${entry.name}-main`);
+      if (existsSync(join(mainDir, '.git'))) {
+        repos.push({ name: entry.name, path: repoDir, mainPath: mainDir });
+      }
+    }
+  } catch {
+    // ~/Developer may not exist
+  }
+
+  res.json({ repos: repos.sort((a, b) => a.name.localeCompare(b.name)) });
 });
 
 // --- Quick input (sends keys to tmux directly, no pty needed) ---

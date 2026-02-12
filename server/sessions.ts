@@ -1,4 +1,5 @@
-import { execSync, execFileSync } from 'child_process';
+import { execSync, execFileSync, exec } from 'child_process';
+import { basename, dirname, join } from 'path';
 import { nanoid } from 'nanoid';
 import {
   insertSession,
@@ -6,8 +7,10 @@ import {
   getSession,
   updateSessionStatus,
   removeSession,
+  setSessionMeta,
   type Session,
 } from './db.js';
+import { sendInput } from './input.js';
 
 const TMUX_PREFIX = 'cc-';
 
@@ -25,11 +28,18 @@ function tmuxSessionExists(name: string): boolean {
   }
 }
 
+interface CreateSessionOpts {
+  worktreePath?: string;
+  initialPrompt?: string;
+  repo?: string;
+}
+
 /** Create a new session in tmux. Defaults to `claude` but supports any command. */
 export function createSession(
   name: string,
   cwd: string,
-  command?: string
+  command?: string,
+  opts?: CreateSessionOpts,
 ): Session {
   const id = nanoid(10);
   const tmuxName = tmuxSessionName(id);
@@ -47,6 +57,14 @@ export function createSession(
 
   insertSession(id, name, cwd);
   updateSessionStatus(id, 'running');
+
+  if (opts?.worktreePath || opts?.repo) {
+    setSessionMeta(id, opts.worktreePath, opts.repo);
+  }
+
+  if (opts?.initialPrompt) {
+    setTimeout(() => sendInput(id, opts.initialPrompt!), 5000);
+  }
 
   return getSession(id)!;
 }
@@ -83,6 +101,17 @@ export function killSession(id: string): boolean {
       execFileSync('tmux', ['kill-session', '-t', tmuxName]);
     } catch {
       // Session may already be gone
+    }
+  }
+
+  // Clean up git worktree if this was a worktree session
+  if (session.worktree_path) {
+    try {
+      const repoName = basename(dirname(session.worktree_path));
+      const mainPath = join(dirname(session.worktree_path), `${repoName}-main`);
+      execFileSync('git', ['-C', mainPath, 'worktree', 'remove', '--force', session.worktree_path]);
+    } catch (err) {
+      console.error(`Failed to remove worktree ${session.worktree_path}:`, err);
     }
   }
 

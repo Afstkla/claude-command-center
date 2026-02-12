@@ -37,7 +37,9 @@ button:hover {
   background: var(--accent-hover);
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border);
@@ -45,9 +47,21 @@ input {
   background: var(--bg);
   color: var(--text);
   font-size: 0.875rem;
+  font-family: inherit;
 }
 
-input:focus {
+select {
+  cursor: pointer;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 2.5rem;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -105,6 +119,19 @@ input:focus {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
+}
+
+.repo-group {
+  margin-top: 1.5rem;
+}
+
+.repo-group-header {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
 }
 
 /* Session Card */

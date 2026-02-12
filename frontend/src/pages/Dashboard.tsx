@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SessionCard } from '../components/SessionCard';
 import { NewSessionDialog } from '../components/NewSessionDialog';
 
@@ -9,6 +9,8 @@ interface Session {
   status: string;
   created_at: string;
   last_activity: string;
+  worktree_path: string | null;
+  repo: string | null;
 }
 
 export function Dashboard() {
@@ -31,6 +33,21 @@ export function Dashboard() {
     await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
     fetchSessions();
   }
+
+  const { grouped, ungrouped } = useMemo(() => {
+    const grouped = new Map<string, Session[]>();
+    const ungrouped: Session[] = [];
+    for (const s of sessions) {
+      if (s.repo) {
+        const list = grouped.get(s.repo) || [];
+        list.push(s);
+        grouped.set(s.repo, list);
+      } else {
+        ungrouped.push(s);
+      }
+    }
+    return { grouped, ungrouped };
+  }, [sessions]);
 
   async function handleQuickAction(id: string, text: string) {
     await fetch(`/api/sessions/${id}/input`, {
@@ -55,16 +72,34 @@ export function Dashboard() {
         <p className="empty">No sessions. Create one to get started.</p>
       )}
 
-      <div className="session-grid">
-        {sessions.map((s) => (
-          <SessionCard
-            key={s.id}
-            session={s}
-            onKill={() => handleKill(s.id)}
-            onQuickAction={(text) => handleQuickAction(s.id, text)}
-          />
-        ))}
-      </div>
+      {ungrouped.length > 0 && (
+        <div className="session-grid">
+          {ungrouped.map((s) => (
+            <SessionCard
+              key={s.id}
+              session={s}
+              onKill={() => handleKill(s.id)}
+              onQuickAction={(text) => handleQuickAction(s.id, text)}
+            />
+          ))}
+        </div>
+      )}
+
+      {[...grouped.entries()].map(([repo, repoSessions]) => (
+        <div key={repo} className="repo-group">
+          <h2 className="repo-group-header">{repo}</h2>
+          <div className="session-grid">
+            {repoSessions.map((s) => (
+              <SessionCard
+                key={s.id}
+                session={s}
+                onKill={() => handleKill(s.id)}
+                onQuickAction={(text) => handleQuickAction(s.id, text)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
 
       {showNew && (
         <NewSessionDialog

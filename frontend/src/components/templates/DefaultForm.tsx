@@ -4,6 +4,9 @@ import { DirectoryBrowser } from '../DirectoryBrowser';
 export interface TemplatePayload {
   cwd: string;
   command: string;
+  worktreePath?: string;
+  initialPrompt?: string;
+  repo?: string;
 }
 
 interface Props {
