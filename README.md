@@ -103,13 +103,29 @@ npm run dev
 ```bash
 npm run build
 npm start
-
-# Or use pm2 for process management:
-npm install -g pm2
-pm2 start "npx tsx server/index.ts" --name command-center --cwd $(pwd)
-pm2 startup  # Auto-start on boot
-pm2 save
 ```
+
+### Running with pm2 (recommended)
+
+Use [pm2](https://pm2.keymetrics.io/) to keep the server running and auto-restart on boot:
+
+```bash
+npm install -g pm2
+
+# Start the server
+pm2 start npm --name command-center --cwd /path/to/claude-command-center -- start
+
+# Save the process list and enable startup on boot
+pm2 save
+pm2 startup  # follow the printed instructions (requires sudo)
+```
+
+> **Important:** Do not run `pm2 start` from inside a Claude Code session. Claude Code sets a `CLAUDECODE` environment variable that pm2 captures, which prevents spawned sessions from starting. If you already did this, fix it with:
+> ```bash
+> pm2 delete command-center
+> env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT pm2 start npm --name command-center --cwd /path/to/claude-command-center -- start
+> pm2 save
+> ```
 
 ## Tailscale setup
 

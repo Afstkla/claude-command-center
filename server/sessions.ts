@@ -47,13 +47,18 @@ export function createSession(
   // Default to claude, but allow any TUI command
   const shellCommand = command || 'claude';
 
+  // Strip Claude Code env vars so nested claude sessions can start
+  const env = { ...process.env };
+  delete env.CLAUDECODE;
+  delete env.CLAUDE_CODE_ENTRYPOINT;
+
   execFileSync('tmux', [
     'new-session',
     '-d',
     '-s', tmuxName,
     '-c', cwd,
     shellCommand,
-  ]);
+  ], { env });
 
   insertSession(id, name, cwd);
   updateSessionStatus(id, 'running');

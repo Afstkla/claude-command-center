@@ -34,7 +34,9 @@ export function GitCloneForm({ onPayloadChange, onSuggestName }: Props) {
       return;
     }
     const escaped = effectiveDirName.replace(/'/g, "'\\''");
-    const command = `mkdir -p '${escaped}' && git clone ${repoUrl} '${escaped}/${escaped}-main' && cd '${escaped}/${escaped}-main' && claude`;
+    const escapedParent = parentDir.replace(/'/g, "'\\''");
+    const targetDir = `${escapedParent}/${escaped}`;
+    const command = `mkdir -p '${targetDir}' && git clone ${repoUrl} '${targetDir}/${escaped}-main' && cd '${targetDir}/${escaped}-main' && claude`;
     onPayloadChange({ cwd: parentDir, command, repo: effectiveDirName });
   }, [repoUrl, effectiveDirName, parentDir, onPayloadChange]);
 
