@@ -169,6 +169,16 @@ textarea:focus {
   font-weight: 600;
 }
 
+.session-pane-title {
+  font-size: 0.75rem;
+  color: var(--accent);
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 0.15rem;
+}
+
 .session-cwd {
   font-size: 0.75rem;
   color: var(--text-dim);
@@ -485,4 +495,116 @@ textarea:focus {
 .terminal-container .xterm {
   position: absolute;
   inset: 4px;
+}
+
+/* Mobile Toolbar — only on narrow / touch viewports */
+
+.mobile-toolbar,
+.mobile-toolbar-toggle {
+  display: none;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .mobile-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.5rem;
+    background: rgba(15, 15, 26, 0.92);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    flex-wrap: wrap;
+  }
+
+  .mobile-toolbar-keys {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-toolbar-sep {
+    width: 1px;
+    height: 1.4rem;
+    background: var(--border);
+    margin: 0 0.15rem;
+    flex-shrink: 0;
+  }
+
+  .mkey {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.4rem 0.55rem;
+    min-width: 2.2rem;
+    text-align: center;
+    background: var(--surface);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+  }
+
+  .mkey:active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .mkey--arrow {
+    min-width: 2rem;
+    padding: 0.4rem 0.45rem;
+    font-size: 0.6rem;
+  }
+
+  .mkey--ctrl.mkey--active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .mobile-toolbar-hint {
+    width: 100%;
+    font-size: 0.65rem;
+    color: var(--accent);
+    padding: 0.1rem 0;
+  }
+
+  .mobile-toolbar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 1rem;
+    padding: 0.3rem;
+    min-width: unset;
+    border: none;
+  }
+
+  .mobile-toolbar-toggle--inline {
+    font-size: 0.9rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  /* Collapsed state: small floating button */
+  .mobile-toolbar-toggle:not(.mobile-toolbar-toggle--inline) {
+    position: fixed;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+    z-index: 10;
+  }
+
+  .toggle-icon {
+    font-size: 1.1rem;
+  }
 }
