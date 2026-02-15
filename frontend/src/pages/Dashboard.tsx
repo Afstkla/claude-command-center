@@ -11,6 +11,7 @@ interface Session {
   last_activity: string;
   worktree_path: string | null;
   repo: string | null;
+  pane_title: string | null;
 }
 
 export function Dashboard() {
