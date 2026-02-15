@@ -9,6 +9,7 @@ interface Props {
     status: string;
     created_at: string;
     last_activity: string;
+    pane_title: string | null;
   };
   onKill: () => void;
   onQuickAction: (text: string) => void;
@@ -34,6 +35,9 @@ export function SessionCard({ session, onKill, onQuickAction }: Props) {
         <span className="status-dot" style={{ backgroundColor: color }} />
         <h3>{session.name}</h3>
       </div>
+      {session.pane_title && (
+        <p className="session-pane-title">{session.pane_title}</p>
+      )}
       <p className="session-cwd">{session.cwd}</p>
       <p className="session-status">{session.status}</p>
       <p className="session-time">

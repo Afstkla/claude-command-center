@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { MobileToolbar } from '../components/MobileToolbar';
 import '@xterm/xterm/css/xterm.css';
 
 const WS_TIMEOUT = 5000; // Fallback to SSE after 5s
@@ -12,7 +13,14 @@ export function Terminal() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const termRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState('Connecting...');
+
+  const sendInput = useCallback((data: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'data', data }));
+    }
+  }, []);
 
   useEffect(() => {
     if (!termRef.current || !id) return;
@@ -46,6 +54,7 @@ export function Terminal() {
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(`${protocol}//${location.host}/ws/terminal/${id}`);
       activeWs = ws;
+      wsRef.current = ws;
 
       const fallbackTimer = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
@@ -135,6 +144,7 @@ export function Terminal() {
         {status && <span style={{ color: '#ff9800', marginLeft: 'auto' }}>{status}</span>}
       </div>
       <div ref={termRef} className="terminal-container" />
+      <MobileToolbar onSend={sendInput} />
     </div>
   );
 }

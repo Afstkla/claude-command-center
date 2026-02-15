@@ -1,5 +1,5 @@
 import { execFileSync } from 'child_process';
-import { getAllSessions, updateSessionStatus } from './db.js';
+import { getAllSessions, updateSessionStatus, updatePaneTitle } from './db.js';
 
 const TMUX_PREFIX = 'cc-';
 const POLL_INTERVAL = 3000;
@@ -13,6 +13,22 @@ function capturePaneLines(tmuxName: string, lines = 15): string[] {
     return output.trimEnd().split('\n').slice(-lines);
   } catch {
     return [];
+  }
+}
+
+/** Get the tmux pane title (dynamically set by Claude Code) */
+function getPaneTitle(tmuxName: string): string | null {
+  try {
+    const output = execFileSync('tmux', [
+      'display-message', '-t', tmuxName, '-p', '#{pane_title}',
+    ], { encoding: 'utf-8' });
+    const title = output.trim();
+    // Ignore default/empty titles
+    if (!title || title === 'bash' || title === 'zsh') return null;
+    // Strip leading spinner/status characters
+    return title.replace(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✳⠐●∙\s]+/, '').trim() || null;
+  } catch {
+    return null;
   }
 }
 
@@ -54,6 +70,11 @@ export function startStatusPolling() {
 
       if (status !== session.status) {
         updateSessionStatus(session.id, status);
+      }
+
+      const title = getPaneTitle(tmuxName);
+      if (title !== session.pane_title) {
+        updatePaneTitle(session.id, title);
       }
     }
   }, POLL_INTERVAL);
