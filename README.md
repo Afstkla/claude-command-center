@@ -127,6 +127,54 @@ pm2 startup  # follow the printed instructions (requires sudo)
 > pm2 save
 > ```
 
+## Network reliability
+
+Since this is designed to run on a headless server accessed remotely, network stability matters. Here are common issues and fixes discovered while running on a Mac Mini over Tailscale.
+
+### Prevent sleep (critical)
+
+macOS defaults to sleeping after a few minutes of inactivity, even on a Mac Mini. Each sleep cycle kills all TCP connections (WebSocket, SSE, API streams). Disable it:
+
+```bash
+sudo pmset -a sleep 0 disksleep 0 powernap 0
+```
+
+Alternatively, keep `caffeinate` running via pm2:
+
+```bash
+pm2 start caffeinate --name no-sleep -- -s
+pm2 save
+```
+
+### Disable Wi-Fi if using Ethernet
+
+If both Ethernet and Wi-Fi are active on the same subnet, macOS may route traffic through either interface unpredictably. This causes long-lived connections (WebSockets, SSE) to break when routes flip. Disable Wi-Fi if you have a wired connection:
+
+```bash
+networksetup -setairportpower en1 off
+```
+
+### Connection resilience
+
+The terminal uses several mechanisms to handle unstable connections:
+
+- **Server-side ping/pong** — the WebSocket server pings clients every 15s and terminates unresponsive connections, preventing zombie sockets
+- **SSE keepalive** — periodic comments prevent proxies and VPN tunnels from dropping idle SSE connections
+- **Automatic reconnect** — the frontend reconnects indefinitely with exponential backoff (up to 30s), instead of giving up after a few attempts
+- **Client-side heartbeat** — if no data arrives within 25s, the client proactively reconnects rather than waiting for a TCP timeout
+- **Dashboard offline banner** — shows a "Connection lost" indicator when the API is unreachable, clears automatically on recovery
+- **Visibility-aware refresh** — the dashboard refetches immediately when the browser tab regains focus or the device comes back online
+
+### Network monitoring
+
+A monitoring script is included for debugging connectivity issues:
+
+```bash
+pm2 start scripts/network-monitor.sh --name network-monitor --interpreter bash
+```
+
+Logs to `logs/network-monitor.log` every 30s with: interface status, default route, ping times, DNS resolution, TCP/HTTPS latency to the Anthropic API, and Tailscale state. Entries are flagged as `PROBLEM` with extra detail when checks fail.
+
 ## Tailscale setup
 
 1. Install [Tailscale](https://tailscale.com/download) on your server and client devices

@@ -6,6 +6,9 @@ import { verifyWsAuth } from './auth.js';
 import { getSession } from './db.js';
 
 const TMUX_PREFIX = 'cc-';
+const WS_PING_INTERVAL = 15_000; // Ping every 15s
+const WS_PONG_TIMEOUT = 10_000;  // Consider dead if no pong within 10s
+const SSE_KEEPALIVE_INTERVAL = 15_000; // SSE comment every 15s
 
 interface TerminalMessage {
   type: 'data' | 'resize';
@@ -81,6 +84,8 @@ function handleWsConnection(ws: WebSocket, sessionId: string) {
   }
 
   let bytesSent = 0;
+  let alive = true;
+
   const onData = (data: string) => {
     if (ws.readyState === WebSocket.OPEN) {
       bytesSent += data.length;
@@ -94,6 +99,21 @@ function handleWsConnection(ws: WebSocket, sessionId: string) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.close(1000, 'Terminal exited');
     }
+  });
+
+  // Ping/pong heartbeat to detect dead connections fast
+  const pingInterval = setInterval(() => {
+    if (!alive) {
+      console.log('[ws] dead connection detected (no pong), terminating');
+      ws.terminate();
+      return;
+    }
+    alive = false;
+    ws.ping();
+  }, WS_PING_INTERVAL);
+
+  ws.on('pong', () => {
+    alive = true;
   });
 
   ws.on('message', (raw) => {
@@ -110,8 +130,12 @@ function handleWsConnection(ws: WebSocket, sessionId: string) {
   });
 
   ws.on('close', () => {
+    clearInterval(pingInterval);
     console.log('[ws] disconnected, sent', bytesSent, 'bytes');
-    // Don't kill the pty — it's shared and might be used by SSE
+  });
+
+  ws.on('error', () => {
+    clearInterval(pingInterval);
   });
 }
 
@@ -144,12 +168,19 @@ export function handleTerminalSSE(req: Request, res: Response) {
 
   term.onData(onData);
 
+  // Keepalive comment to prevent proxies/Tailscale from dropping idle connections
+  const keepalive = setInterval(() => {
+    res.write(': keepalive\n\n');
+  }, SSE_KEEPALIVE_INTERVAL);
+
   term.onExit(() => {
+    clearInterval(keepalive);
     res.write('event: exit\ndata: closed\n\n');
     res.end();
   });
 
   req.on('close', () => {
+    clearInterval(keepalive);
     console.log('[sse] client disconnected for', sessionId);
   });
 }

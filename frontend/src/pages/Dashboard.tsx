@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SessionCard } from '../components/SessionCard';
 import { NewSessionDialog } from '../components/NewSessionDialog';
 
@@ -17,16 +17,38 @@ interface Session {
 export function Dashboard() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [showNew, setShowNew] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const failCount = useRef(0);
 
   const fetchSessions = useCallback(async () => {
-    const res = await fetch('/api/sessions');
-    if (res.ok) setSessions(await res.json());
+    try {
+      const res = await fetch('/api/sessions', { signal: AbortSignal.timeout(10_000) });
+      if (res.ok) {
+        setSessions(await res.json());
+        failCount.current = 0;
+        setOffline(false);
+      } else {
+        failCount.current++;
+      }
+    } catch {
+      failCount.current++;
+    }
+    if (failCount.current >= 2) setOffline(true);
   }, []);
 
   useEffect(() => {
     fetchSessions();
     const id = setInterval(fetchSessions, 5000);
-    return () => clearInterval(id);
+    // Refetch immediately when coming back online or foregrounding
+    const onOnline = () => fetchSessions();
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchSessions(); };
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [fetchSessions]);
 
   async function handleKill(id: string) {
@@ -64,6 +86,11 @@ export function Dashboard() {
 
   return (
     <div className="dashboard">
+      {offline && (
+        <div style={{ background: '#b71c1c', color: '#fff', textAlign: 'center', padding: '8px', fontSize: '14px' }}>
+          Connection lost — retrying...
+        </div>
+      )}
       <header className="dashboard-header">
         <h1>Command Center</h1>
         <button onClick={() => setShowNew(true)}>New Session</button>
