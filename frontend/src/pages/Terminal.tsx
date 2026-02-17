@@ -7,7 +7,9 @@ import { MobileToolbar } from '../components/MobileToolbar';
 import '@xterm/xterm/css/xterm.css';
 
 const WS_TIMEOUT = 5000; // Fallback to SSE after 5s
-const RECONNECT_DELAYS = [1000, 2000, 4000]; // Backoff: 1s, 2s, 4s then stop
+const RECONNECT_BASE = 1000;
+const RECONNECT_MAX = 30_000; // Cap at 30s
+const HEARTBEAT_TIMEOUT = 25_000; // Expect server ping within 25s (server pings every 15s)
 
 export function Terminal() {
   const { id } = useParams<{ id: string }>();
@@ -55,6 +57,15 @@ export function Terminal() {
       const ws = new WebSocket(`${protocol}//${location.host}/ws/terminal/${id}`);
       activeWs = ws;
       wsRef.current = ws;
+      let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+
+      function resetHeartbeat() {
+        if (heartbeatTimer) clearTimeout(heartbeatTimer);
+        heartbeatTimer = setTimeout(() => {
+          console.log('[ws] heartbeat timeout, closing');
+          ws.close();
+        }, HEARTBEAT_TIMEOUT);
+      }
 
       const fallbackTimer = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
@@ -68,6 +79,7 @@ export function Terminal() {
         clearTimeout(fallbackTimer);
         setStatus('');
         attempt = 0;
+        resetHeartbeat();
         ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
 
         // Force tmux to repaint by briefly toggling the size
@@ -79,6 +91,7 @@ export function Terminal() {
         }, 100);
 
         ws.onmessage = (e) => {
+          resetHeartbeat();
           if (e.data instanceof Blob) {
             e.data.text().then((text) => term.write(text));
           } else {
@@ -107,16 +120,14 @@ export function Terminal() {
 
       ws.onclose = () => {
         clearTimeout(fallbackTimer);
+        if (heartbeatTimer) clearTimeout(heartbeatTimer);
         if (disposed) return;
 
-        if (attempt < RECONNECT_DELAYS.length) {
-          const delay = RECONNECT_DELAYS[attempt];
-          setStatus(`Reconnecting in ${delay / 1000}s...`);
-          reconnectTimer = setTimeout(() => connectWs(attempt + 1), delay);
-        } else {
-          term.write('\r\n\x1b[31m[Connection lost]\x1b[0m\r\n');
-          setStatus('Disconnected');
-        }
+        // Exponential backoff with jitter, capped at RECONNECT_MAX. Never give up.
+        const delay = Math.min(RECONNECT_BASE * Math.pow(2, attempt), RECONNECT_MAX);
+        const jitter = delay * (0.5 + Math.random() * 0.5);
+        setStatus(`Reconnecting in ${Math.round(jitter / 1000)}s...`);
+        reconnectTimer = setTimeout(() => connectWs(attempt + 1), jitter);
       };
 
       ws.onerror = () => {
