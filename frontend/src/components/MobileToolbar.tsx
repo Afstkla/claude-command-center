@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface Props {
   onSend: (data: string) => void;
+  onRefresh?: () => void;
 }
 
 // ANSI escape sequences for special keys
@@ -19,7 +20,7 @@ function noFocus(e: React.PointerEvent | React.MouseEvent) {
   e.preventDefault();
 }
 
-export function MobileToolbar({ onSend }: Props) {
+export function MobileToolbar({ onSend, onRefresh }: Props) {
   const [ctrlActive, setCtrlActive] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const ctrlRef = useRef(false);
@@ -90,6 +91,13 @@ export function MobileToolbar({ onSend }: Props) {
         <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.down)}>&#x25BC;</button>
         <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.left)}>&#x25C0;</button>
         <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.right)}>&#x25B6;</button>
+
+        {onRefresh && (
+          <>
+            <span className="mobile-toolbar-sep" />
+            <button className="mkey" onClick={onRefresh} title="Refresh display">&#x21BB;</button>
+          </>
+        )}
       </div>
 
       {ctrlActive && (
