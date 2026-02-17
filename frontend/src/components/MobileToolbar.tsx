@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface Props {
   onSend: (data: string) => void;
@@ -14,27 +14,48 @@ const KEYS = {
   tab: '\t',
 } as const;
 
+/** Prevent focus from leaving the terminal (keeps mobile keyboard open) */
+function noFocus(e: React.PointerEvent | React.MouseEvent) {
+  e.preventDefault();
+}
+
 export function MobileToolbar({ onSend }: Props) {
   const [ctrlActive, setCtrlActive] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const ctrlRef = useRef(false);
 
-  const send = useCallback((key: string) => {
-    if (ctrlActive) {
-      // Ctrl+key: send the control character (char code 1-26 for a-z)
-      const code = key.toLowerCase().charCodeAt(0) - 96;
+  // Keep ref in sync so the xterm interceptor always sees current state
+  useEffect(() => { ctrlRef.current = ctrlActive; }, [ctrlActive]);
+
+  // Register a global keydown listener when ctrl mode is active.
+  // This intercepts keyboard input before xterm sees it and sends
+  // the corresponding control character (Ctrl+C = \x03, etc).
+  useEffect(() => {
+    if (!ctrlActive) return;
+
+    function handleKey(e: KeyboardEvent) {
+      if (!ctrlRef.current) return;
+      if (e.key.length !== 1) return; // ignore shift, meta, etc.
+
+      const code = e.key.toLowerCase().charCodeAt(0) - 96;
       if (code >= 1 && code <= 26) {
+        e.preventDefault();
+        e.stopPropagation();
         onSend(String.fromCharCode(code));
       }
       setCtrlActive(false);
-    } else {
-      onSend(key);
     }
+
+    // Use capture phase to intercept before xterm's handler
+    document.addEventListener('keydown', handleKey, true);
+    return () => document.removeEventListener('keydown', handleKey, true);
   }, [ctrlActive, onSend]);
 
   if (collapsed) {
     return (
       <button
         className="mobile-toolbar-toggle"
+        onPointerDown={noFocus}
         onClick={() => setCollapsed(false)}
         aria-label="Show toolbar"
       >
@@ -44,7 +65,7 @@ export function MobileToolbar({ onSend }: Props) {
   }
 
   return (
-    <div className="mobile-toolbar">
+    <div className="mobile-toolbar" onPointerDown={noFocus}>
       <button
         className="mobile-toolbar-toggle mobile-toolbar-toggle--inline"
         onClick={() => setCollapsed(true)}
@@ -54,26 +75,26 @@ export function MobileToolbar({ onSend }: Props) {
       </button>
 
       <div className="mobile-toolbar-keys">
-        <button className="mkey" onPointerDown={() => send(KEYS.esc)}>Esc</button>
-        <button className="mkey" onPointerDown={() => send(KEYS.tab)}>Tab</button>
+        <button className="mkey" onClick={() => onSend(KEYS.esc)}>Esc</button>
+        <button className="mkey" onClick={() => onSend(KEYS.tab)}>Tab</button>
         <button
           className={`mkey mkey--ctrl${ctrlActive ? ' mkey--active' : ''}`}
-          onPointerDown={() => setCtrlActive((v) => !v)}
+          onClick={() => setCtrlActive((v) => !v)}
         >
           Ctrl
         </button>
 
         <span className="mobile-toolbar-sep" />
 
-        <button className="mkey mkey--arrow" onPointerDown={() => send(KEYS.up)}>&#x25B2;</button>
-        <button className="mkey mkey--arrow" onPointerDown={() => send(KEYS.down)}>&#x25BC;</button>
-        <button className="mkey mkey--arrow" onPointerDown={() => send(KEYS.left)}>&#x25C0;</button>
-        <button className="mkey mkey--arrow" onPointerDown={() => send(KEYS.right)}>&#x25B6;</button>
+        <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.up)}>&#x25B2;</button>
+        <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.down)}>&#x25BC;</button>
+        <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.left)}>&#x25C0;</button>
+        <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.right)}>&#x25B6;</button>
       </div>
 
       {ctrlActive && (
         <div className="mobile-toolbar-hint">
-          Ctrl mode: tap a letter key on your keyboard
+          Ctrl mode: tap a letter key
         </div>
       )}
     </div>

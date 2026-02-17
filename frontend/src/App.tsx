@@ -4,6 +4,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Terminal } from './pages/Terminal';
 import { Respond } from './pages/Respond';
+import { UpdateToast } from './components/UpdateToast';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [auth, setAuth] = useState<'loading' | 'ok' | 'denied'>('loading');
@@ -22,6 +23,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export function App() {
   return (
     <BrowserRouter>
+      <UpdateToast />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/respond/:requestId" element={<Respond />} />

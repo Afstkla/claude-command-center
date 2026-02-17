@@ -2,7 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
-import { readdirSync, statSync, existsSync } from 'fs';
+import { createHash } from 'crypto';
+import { readdirSync, readFileSync, statSync, existsSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
@@ -131,6 +132,17 @@ app.post('/api/sessions/:id/notify', (req, res) => {
   notifyWaiting(session.id, session.name, { tool_name, tool_input });
   res.json({ ok: true });
 });
+
+// --- Version (for "new version available" detection, no auth needed) ---
+
+const indexHtmlPath = join(__dirname, '..', 'frontend', 'dist', 'index.html');
+let buildHash = '';
+try {
+  buildHash = createHash('md5').update(readFileSync(indexHtmlPath)).digest('hex').slice(0, 8);
+} catch {
+  // No build yet (dev mode)
+}
+app.get('/api/version', (_req, res) => res.json({ hash: buildHash }));
 
 // Auth middleware for API routes
 app.use('/api', authMiddleware);
