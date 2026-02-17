@@ -16,12 +16,26 @@ export function Terminal() {
   const navigate = useNavigate();
   const termRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const termInstanceRef = useRef<XTerm | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
   const [status, setStatus] = useState('Connecting...');
 
   const sendInput = useCallback((data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'data', data }));
     }
+  }, []);
+
+  const refresh = useCallback(() => {
+    const term = termInstanceRef.current;
+    const fit = fitAddonRef.current;
+    const ws = wsRef.current;
+    if (!term || !fit || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+    fit.fit();
+    // Toggle size to force tmux full repaint
+    ws.send(JSON.stringify({ type: 'resize', cols: term.cols + 1, rows: term.rows }));
+    ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
   }, []);
 
   useEffect(() => {
@@ -43,6 +57,8 @@ export function Terminal() {
     term.loadAddon(new WebLinksAddon());
     term.open(termRef.current);
     fitAddon.fit();
+    termInstanceRef.current = term;
+    fitAddonRef.current = fitAddon;
 
     let disposed = false;
     let activeWs: WebSocket | null = null;
@@ -155,7 +171,7 @@ export function Terminal() {
         {status && <span style={{ color: '#ff9800', marginLeft: 'auto' }}>{status}</span>}
       </div>
       <div ref={termRef} className="terminal-container" />
-      <MobileToolbar onSend={sendInput} />
+      <MobileToolbar onSend={sendInput} onRefresh={refresh} />
     </div>
   );
 }
