@@ -201,18 +201,71 @@ textarea:focus {
   margin-top: 0.25rem;
 }
 
-.kill-btn {
+.session-card-actions {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.kill-btn {
   background: transparent;
   color: var(--text-dim);
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
 }
 
-.kill-btn:hover {
+.kill-btn:hover,
+.kill-btn--confirm {
   background: var(--danger);
+  color: white;
+}
+
+/* Refresh (restart Claude) button */
+
+.refresh-btn {
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 1rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.refresh-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover, rgba(255, 255, 255, 0.1));
+}
+
+/* Rocket mode toggle */
+
+.rocket-btn {
+  background: transparent;
+  font-size: 1rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  opacity: 0.4;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.rocket-btn:hover {
+  opacity: 0.7;
+}
+
+.rocket-btn--active {
+  opacity: 1;
+  background: rgba(255, 152, 0, 0.15);
+  border-color: #ff9800;
+}
+
+.rocket-btn--confirm {
+  opacity: 1;
+  font-size: 0.75rem;
+  background: #ff9800;
   color: white;
 }
 
@@ -469,6 +522,7 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   height: 100dvh;
+  overflow: hidden;
 }
 
 .terminal-header {

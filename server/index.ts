@@ -8,7 +8,8 @@ import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 import { login, authMiddleware, COOKIE_NAME, MAX_AGE_HOURS } from './auth.js';
-import { createSession, listSessions, killSession, getSession } from './sessions.js';
+import { createSession, listSessions, killSession, refreshSession, getSession } from './sessions.js';
+import { getSession as getSessionFromDb, setRocketMode } from './db.js';
 import { syncSessionsWithTmux } from './sessions.js';
 import { setupTerminalWs, handleTerminalSSE, handleTerminalInput } from './terminal.js';
 import { sendInput } from './input.js';
@@ -133,6 +134,23 @@ app.post('/api/sessions/:id/notify', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Rocket mode check (token auth, called by PreToolUse hook) ---
+
+app.get('/api/sessions/:id/rocket', (req, res) => {
+  const token = req.query.token as string;
+  if (!token || !process.env.NTFY_AUTH_TOKEN || token !== process.env.NTFY_AUTH_TOKEN) {
+    res.status(401).json({ error: 'Invalid token' });
+    return;
+  }
+
+  const session = getSessionFromDb(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+  res.json({ rocket_mode: !!session.rocket_mode });
+});
+
 // --- Version (for "new version available" detection, no auth needed) ---
 
 const indexHtmlPath = join(__dirname, '..', 'frontend', 'dist', 'index.html');
@@ -239,6 +257,26 @@ app.delete('/api/sessions/:id', (req, res) => {
     return;
   }
   res.json({ ok: true });
+});
+
+app.post('/api/sessions/:id/refresh', (req, res) => {
+  const success = refreshSession(req.params.id);
+  if (!success) {
+    res.status(404).json({ error: 'Session not found or dead' });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/sessions/:id/rocket', (req, res) => {
+  const session = getSessionFromDb(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+  const enabled = !session.rocket_mode;
+  setRocketMode(req.params.id, enabled);
+  res.json({ rocket_mode: enabled });
 });
 
 // --- Repos (scan ~/Developer for worktree-structured repos) ---

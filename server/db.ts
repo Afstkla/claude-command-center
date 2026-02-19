@@ -25,6 +25,7 @@ db.exec(`
 try { db.exec(`ALTER TABLE sessions ADD COLUMN worktree_path TEXT`); } catch {}
 try { db.exec(`ALTER TABLE sessions ADD COLUMN repo TEXT`); } catch {}
 try { db.exec(`ALTER TABLE sessions ADD COLUMN pane_title TEXT`); } catch {}
+try { db.exec(`ALTER TABLE sessions ADD COLUMN rocket_mode INTEGER NOT NULL DEFAULT 0`); } catch {}
 
 export interface Session {
   id: string;
@@ -36,6 +37,7 @@ export interface Session {
   worktree_path: string | null;
   repo: string | null;
   pane_title: string | null;
+  rocket_mode: number;
 }
 
 const stmts = {
@@ -53,6 +55,9 @@ const stmts = {
   ),
   updatePaneTitle: db.prepare(
     'UPDATE sessions SET pane_title = ? WHERE id = ?'
+  ),
+  setRocketMode: db.prepare(
+    'UPDATE sessions SET rocket_mode = ? WHERE id = ?'
   ),
 };
 
@@ -82,6 +87,10 @@ export function updatePaneTitle(id: string, title: string | null) {
 
 export function setSessionMeta(id: string, worktreePath?: string, repo?: string) {
   stmts.setMeta.run(worktreePath ?? null, repo ?? null, id);
+}
+
+export function setRocketMode(id: string, enabled: boolean) {
+  stmts.setRocketMode.run(enabled ? 1 : 0, id);
 }
 
 export default db;

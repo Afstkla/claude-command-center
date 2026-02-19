@@ -57,8 +57,11 @@ export function createSession(
     '-d',
     '-s', tmuxName,
     '-c', cwd,
-    shellCommand,
   ], { env });
+
+  // Send the command inside the shell so the tmux session survives if the command exits
+  execFileSync('tmux', ['send-keys', '-t', tmuxName, '-l', shellCommand]);
+  execFileSync('tmux', ['send-keys', '-t', tmuxName, 'Enter']);
 
   insertSession(id, name, cwd);
   updateSessionStatus(id, 'running');
@@ -121,6 +124,120 @@ export function killSession(id: string): boolean {
   }
 
   removeSession(id);
+  return true;
+}
+
+/** Poll a condition every `ms` until it returns true, up to `maxAttempts` times */
+function pollUntil(
+  check: () => boolean,
+  then: () => void,
+  ms: number,
+  maxAttempts: number,
+) {
+  let attempts = 0;
+  const interval = setInterval(() => {
+    attempts++;
+    if (attempts > maxAttempts) {
+      clearInterval(interval);
+      console.log('[refresh] polling timed out');
+      return;
+    }
+    try {
+      if (check()) {
+        clearInterval(interval);
+        then();
+      }
+    } catch (err) {
+      // Don't give up on transient errors, just log and retry
+      console.log('[refresh] poll error:', err);
+    }
+  }, ms);
+}
+
+function isPaneReady(tmuxName: string): 'dead' | 'prompt' | 'waiting' {
+  try {
+    const paneState = execSync(
+      `tmux list-panes -t ${tmuxName} -F '#{pane_dead}'`,
+      { encoding: 'utf-8', timeout: 3000 },
+    ).trim();
+    if (paneState === '1') return 'dead';
+
+    const output = execSync(
+      `tmux capture-pane -t ${tmuxName} -p | tail -3`,
+      { encoding: 'utf-8', timeout: 3000 },
+    );
+    if (/[$%❯]\s*$/.test(output.trim())) return 'prompt';
+  } catch { /* ignore */ }
+  return 'waiting';
+}
+
+function sendContinueCommand(tmuxName: string) {
+  execFileSync('tmux', ['send-keys', '-t', tmuxName, '-l', '--', 'claude --continue']);
+  execFileSync('tmux', ['send-keys', '-t', tmuxName, 'Enter']);
+}
+
+/** Restart Claude Code in an existing tmux session with --continue */
+export function refreshSession(id: string): boolean {
+  const session = getSession(id);
+  if (!session) return false;
+
+  const tmuxName = tmuxSessionName(id);
+  if (!tmuxSessionExists(tmuxName)) return false;
+
+  const cwd = session.cwd === '~' ? '' : session.cwd;
+
+  try {
+    // Keep the pane alive after Claude exits (for old-style sessions where Claude IS the process)
+    execFileSync('tmux', ['set-option', '-t', tmuxName, 'remain-on-exit', 'on']);
+    // Ctrl+C to cancel any in-progress operation, then /exit to quit
+    execFileSync('tmux', ['send-keys', '-t', tmuxName, 'C-c', '']);
+  } catch {
+    return false;
+  }
+
+  // Step 1: Wait 1s for Ctrl+C to land, then send /exit
+  setTimeout(() => {
+    try {
+      execFileSync('tmux', ['send-keys', '-t', tmuxName, '-l', '--', '/exit']);
+      execFileSync('tmux', ['send-keys', '-t', tmuxName, 'Enter']);
+    } catch { return; }
+
+    // Step 2: Poll until Claude has exited (pane dead or shell prompt)
+    pollUntil(
+      () => isPaneReady(tmuxName) !== 'waiting',
+      () => {
+        const state = isPaneReady(tmuxName);
+        console.log('[refresh] Claude exited, pane state:', state);
+
+        if (state === 'dead') {
+          // Old-style session: respawn pane with a shell
+          const args = ['respawn-pane', '-k', '-t', tmuxName];
+          if (cwd) args.push('-c', cwd);
+          execFileSync('tmux', args);
+          execFileSync('tmux', ['set-option', '-t', tmuxName, 'remain-on-exit', 'off']);
+
+          // Step 3: Wait for the new shell to be ready, then send claude --continue
+          pollUntil(
+            () => isPaneReady(tmuxName) === 'prompt',
+            () => {
+              console.log('[refresh] shell ready, sending claude --continue');
+              sendContinueCommand(tmuxName);
+            },
+            500,
+            20, // 10s
+          );
+        } else {
+          // New-style session: already at shell prompt
+          execFileSync('tmux', ['set-option', '-t', tmuxName, 'remain-on-exit', 'off']);
+          console.log('[refresh] at prompt, sending claude --continue');
+          sendContinueCommand(tmuxName);
+        }
+      },
+      1000,
+      30, // 30s max wait for Claude to exit (/exit can be slow)
+    );
+  }, 1000);
+
   return true;
 }
 

@@ -4,6 +4,7 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { MobileToolbar } from '../components/MobileToolbar';
+import { RocketToggle } from '../components/RocketToggle';
 import '@xterm/xterm/css/xterm.css';
 
 const WS_TIMEOUT = 5000; // Fallback to SSE after 5s
@@ -19,6 +20,18 @@ export function Terminal() {
   const termInstanceRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const [status, setStatus] = useState('Connecting...');
+  const [sessionName, setSessionName] = useState('');
+  const [rocketMode, setRocketMode] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/sessions/${id}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((s) => {
+        if (s?.name) setSessionName(s.name);
+        if (s) setRocketMode(!!s.rocket_mode);
+      });
+  }, [id]);
 
   const sendInput = useCallback((data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -167,8 +180,20 @@ export function Terminal() {
     <div className="terminal-page">
       <div className="terminal-header">
         <button onClick={() => navigate('/')}>Back</button>
-        <span>Session: {id}</span>
-        {status && <span style={{ color: '#ff9800', marginLeft: 'auto' }}>{status}</span>}
+        <span>{sessionName ? `${sessionName} (${id})` : id}</span>
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {status && <span style={{ color: '#ff9800' }}>{status}</span>}
+          {id && (
+            <button
+              className="refresh-btn"
+              title="Restart Claude with --continue"
+              onClick={() => fetch(`/api/sessions/${id}/refresh`, { method: 'POST' })}
+            >
+              &#x21BB;
+            </button>
+          )}
+          {id && <RocketToggle sessionId={id} initial={rocketMode} />}
+        </span>
       </div>
       <div ref={termRef} className="terminal-container" />
       <MobileToolbar onSend={sendInput} onRefresh={refresh} />

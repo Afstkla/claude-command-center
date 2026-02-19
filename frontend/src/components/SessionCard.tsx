@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { RocketToggle } from './RocketToggle';
 
 interface Props {
   session: {
@@ -10,8 +11,10 @@ interface Props {
     created_at: string;
     last_activity: string;
     pane_title: string | null;
+    rocket_mode: number;
   };
   onKill: () => void;
+  onRefresh: () => void;
   onQuickAction: (text: string) => void;
 }
 
@@ -23,11 +26,12 @@ const STATUS_COLORS: Record<string, string> = {
   dead: '#f44336',
 };
 
-export function SessionCard({ session, onKill, onQuickAction }: Props) {
+export function SessionCard({ session, onKill, onRefresh, onQuickAction }: Props) {
   const navigate = useNavigate();
   const color = STATUS_COLORS[session.status] || '#9e9e9e';
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customText, setCustomText] = useState('');
+  const [confirmKill, setConfirmKill] = useState(false);
 
   return (
     <div className="session-card" onClick={() => navigate(`/session/${session.id}`)}>
@@ -43,15 +47,30 @@ export function SessionCard({ session, onKill, onQuickAction }: Props) {
       <p className="session-time">
         {new Date(session.last_activity + 'Z').toLocaleString()}
       </p>
-      <button
-        className="kill-btn"
-        onClick={(e) => {
-          e.stopPropagation();
-          onKill();
-        }}
-      >
-        Kill
-      </button>
+
+      <div className="session-card-actions" onClick={(e) => e.stopPropagation()}>
+        <RocketToggle sessionId={session.id} initial={!!session.rocket_mode} />
+        <button
+          className="refresh-btn"
+          onClick={onRefresh}
+          title="Restart Claude with --continue"
+        >
+          &#x21BB;
+        </button>
+        <button
+          className={`kill-btn${confirmKill ? ' kill-btn--confirm' : ''}`}
+          onClick={() => {
+            if (confirmKill) {
+              onKill();
+            } else {
+              setConfirmKill(true);
+              setTimeout(() => setConfirmKill(false), 3000);
+            }
+          }}
+        >
+          {confirmKill ? 'Confirm?' : 'Kill'}
+        </button>
+      </div>
 
       {session.status === 'waiting' && !showCustomInput && (
         <div className="quick-actions" onClick={(e) => e.stopPropagation()}>

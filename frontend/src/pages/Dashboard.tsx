@@ -12,6 +12,7 @@ interface Session {
   worktree_path: string | null;
   repo: string | null;
   pane_title: string | null;
+  rocket_mode: number;
 }
 
 export function Dashboard() {
@@ -52,9 +53,12 @@ export function Dashboard() {
   }, [fetchSessions]);
 
   async function handleKill(id: string) {
-    if (!confirm('Kill this session?')) return;
     await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
     fetchSessions();
+  }
+
+  async function handleRefresh(id: string) {
+    await fetch(`/api/sessions/${id}/refresh`, { method: 'POST' });
   }
 
   const { grouped, ungrouped } = useMemo(() => {
@@ -107,6 +111,7 @@ export function Dashboard() {
               key={s.id}
               session={s}
               onKill={() => handleKill(s.id)}
+              onRefresh={() => handleRefresh(s.id)}
               onQuickAction={(text) => handleQuickAction(s.id, text)}
             />
           ))}
@@ -122,6 +127,7 @@ export function Dashboard() {
                 key={s.id}
                 session={s}
                 onKill={() => handleKill(s.id)}
+                onRefresh={() => handleRefresh(s.id)}
                 onQuickAction={(text) => handleQuickAction(s.id, text)}
               />
             ))}
