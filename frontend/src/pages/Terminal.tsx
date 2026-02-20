@@ -109,6 +109,8 @@ export function Terminal() {
         setStatus('');
         attempt = 0;
         resetHeartbeat();
+        // Clear stale scrollback so reconnect repaints don't accumulate duplicates
+        term.clear();
         ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
 
         // Force tmux to repaint by briefly toggling the size
