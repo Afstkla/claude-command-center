@@ -211,8 +211,11 @@ export function refreshSession(id: string): boolean {
 
         if (state === 'dead') {
           // Old-style session: respawn pane with a shell
+          // Explicit shell command prevents respawn-pane from re-running the original command
+          const shell = process.env.SHELL || '/bin/bash';
           const args = ['respawn-pane', '-k', '-t', tmuxName];
           if (cwd) args.push('-c', cwd);
+          args.push(shell);
           execFileSync('tmux', args);
           execFileSync('tmux', ['set-option', '-t', tmuxName, 'remain-on-exit', 'off']);
 
