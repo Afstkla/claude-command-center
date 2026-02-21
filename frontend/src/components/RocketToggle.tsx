@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Props {
   sessionId: string;
@@ -7,6 +7,7 @@ interface Props {
 
 export function RocketToggle({ sessionId, initial }: Props) {
   const [enabled, setEnabled] = useState(initial);
+  useEffect(() => setEnabled(initial), [initial]);
   const [confirmEnable, setConfirmEnable] = useState(false);
 
   async function toggle() {
