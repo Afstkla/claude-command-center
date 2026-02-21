@@ -544,6 +544,7 @@ textarea:focus {
   flex: 1;
   overflow: hidden;
   position: relative;
+  touch-action: none;
 }
 
 .terminal-container .xterm {
