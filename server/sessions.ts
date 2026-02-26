@@ -182,9 +182,31 @@ export function refreshSession(id: string): boolean {
   if (!session) return false;
 
   const tmuxName = tmuxSessionName(id);
-  if (!tmuxSessionExists(tmuxName)) return false;
-
   const cwd = session.cwd === '~' ? '' : session.cwd;
+
+  // Revive dead sessions: create a new tmux session and run claude --continue
+  if (!tmuxSessionExists(tmuxName)) {
+    try {
+      const args = ['new-session', '-d', '-s', tmuxName];
+      if (cwd) args.push('-c', cwd);
+      execFileSync('tmux', args);
+
+      // Short delay for shell to initialize, then send claude --continue
+      // Can't use pollUntil here because the terminal WebSocket attaches to the pane
+      // immediately after we return, which makes isPaneReady see the attach output
+      setTimeout(() => {
+        console.log('[revive] sending claude --continue');
+        execFileSync('tmux', ['send-keys', '-t', tmuxName, '-l', '--', 'unset CLAUDECODE CLAUDE_CODE_ENTRYPOINT && claude --continue']);
+        execFileSync('tmux', ['send-keys', '-t', tmuxName, 'Enter']);
+      }, 1500);
+
+      updateSessionStatus(id, 'running');
+      return true;
+    } catch (err) {
+      console.error('[revive] failed to create tmux session:', err);
+      return false;
+    }
+  }
 
   try {
     // Keep the pane alive after Claude exits (for old-style sessions where Claude IS the process)

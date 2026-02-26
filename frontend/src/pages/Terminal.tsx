@@ -168,7 +168,20 @@ export function Terminal() {
 
     connectWs();
 
+    // Intercept scroll wheel to use tmux copy-mode instead of xterm scrollback
+    const termEl = termRef.current;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const lines = Math.sign(e.deltaY) * Math.max(1, Math.round(Math.abs(e.deltaY) / 40));
+      if (activeWs?.readyState === WebSocket.OPEN) {
+        activeWs.send(JSON.stringify({ type: 'scroll', lines }));
+      }
+    };
+    termEl.addEventListener('wheel', onWheel, { passive: false, capture: true });
+
     return () => {
+      termEl.removeEventListener('wheel', onWheel, { capture: true });
       disposed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (handleResize) window.removeEventListener('resize', handleResize);

@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import { execFileSync } from 'child_process';
 import * as pty from 'node-pty';
 import type { Server } from 'http';
 import type { Request, Response } from 'express';
@@ -11,10 +12,11 @@ const WS_PONG_TIMEOUT = 10_000;  // Consider dead if no pong within 10s
 const SSE_KEEPALIVE_INTERVAL = 15_000; // SSE comment every 15s
 
 interface TerminalMessage {
-  type: 'data' | 'resize';
+  type: 'data' | 'resize' | 'scroll';
   data?: string;
   cols?: number;
   rows?: number;
+  lines?: number;
 }
 
 // Shared pty instances — keyed by session ID, so both WS and HTTP can use the same pty
@@ -123,6 +125,16 @@ function handleWsConnection(ws: WebSocket, sessionId: string) {
         term.write(msg.data);
       } else if (msg.type === 'resize' && msg.cols && msg.rows) {
         term.resize(msg.cols, msg.rows);
+      } else if (msg.type === 'scroll' && msg.lines) {
+        const tmuxName = `${TMUX_PREFIX}${sessionId}`;
+        const count = Math.abs(msg.lines);
+        const key = msg.lines < 0 ? 'Up' : 'Down';
+        try {
+          execFileSync('tmux', ['copy-mode', '-t', tmuxName]);
+          const args = ['send-keys', '-t', tmuxName];
+          for (let i = 0; i < count; i++) args.push(key);
+          execFileSync('tmux', args);
+        } catch { /* ignore if not in copy-mode */ }
       }
     } catch {
       term.write(raw.toString());
