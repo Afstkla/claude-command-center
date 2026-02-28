@@ -67,17 +67,10 @@ export function MobileToolbar({ onSend, onRefresh }: Props) {
 
   return (
     <div className="mobile-toolbar" onPointerDown={noFocus}>
-      <button
-        className="mobile-toolbar-toggle mobile-toolbar-toggle--inline"
-        onClick={() => setCollapsed(true)}
-        aria-label="Hide toolbar"
-      >
-        &times;
-      </button>
-
       <div className="mobile-toolbar-keys">
         <button className="mkey" onClick={() => onSend(KEYS.esc)}>Esc</button>
         <button className="mkey" onClick={() => onSend(KEYS.tab)}>Tab</button>
+        <button className="mkey" onClick={() => onSend('\x1b[Z')} title="Shift+Tab (toggle mode)">Mode</button>
         <button
           className={`mkey mkey--ctrl${ctrlActive ? ' mkey--active' : ''}`}
           onClick={() => setCtrlActive((v) => !v)}
@@ -92,11 +85,17 @@ export function MobileToolbar({ onSend, onRefresh }: Props) {
         <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.left)}>&#x25C0;</button>
         <button className="mkey mkey--arrow" onClick={() => onSend(KEYS.right)}>&#x25B6;</button>
 
+        <span className="mobile-toolbar-sep" />
+
+        <button className="mkey" onClick={async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (text) onSend(text);
+          } catch { /* clipboard permission denied */ }
+        }} title="Paste from clipboard">Paste</button>
+
         {onRefresh && (
-          <>
-            <span className="mobile-toolbar-sep" />
-            <button className="mkey" onClick={onRefresh} title="Refresh display">&#x21BB;</button>
-          </>
+          <button className="mkey" onClick={onRefresh} title="Refresh display">&#x21BB;</button>
         )}
       </div>
 
