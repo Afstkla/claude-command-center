@@ -11,24 +11,38 @@ If so, outputs {"hookSpecificOutput": {"permissionDecision": "allow"}} to auto-a
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from urllib.request import Request, urlopen
 
+LOG = Path(__file__).resolve().parent.parent / "logs" / "rocket-hook.log"
 
-def get_tmux_session() -> str | None:
-    """Get the current tmux session name, or None if not in a cc- session."""
+
+def log(msg: str):
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(LOG, "a") as f:
+        f.write(msg + "\n")
+
+
+def get_cc_session_id() -> str | None:
+    """Get the Command Center session ID from the tmux session name."""
+    # Try TMUX env var first — if set, we're inside a tmux session
+    tmux_env = os.environ.get("TMUX", "")
+    log(f"TMUX env: {tmux_env!r}")
+
     try:
         result = subprocess.run(
             ["tmux", "display-message", "-p", "#S"],
             capture_output=True, text=True, timeout=5,
         )
         name = result.stdout.strip()
+        log(f"tmux display-message: {name!r}, stderr: {result.stderr.strip()!r}")
         if name.startswith("cc-"):
-            return name
-    except Exception:
-        pass
+            return name.removeprefix("cc-")
+    except Exception as e:
+        log(f"tmux error: {e}")
     return None
 
 
@@ -51,26 +65,57 @@ def check_rocket_mode(port: str, session_id: str, token: str) -> bool:
         req = Request(url, method="GET")
         resp = urlopen(req, timeout=3)
         data = json.loads(resp.read())
+        log(f"API response for {session_id}: {data}")
         return data.get("rocket_mode", False)
-    except Exception:
+    except Exception as e:
+        log(f"API error: {e}")
         return False
 
 
 def main():
-    tmux_name = get_tmux_session()
-    if not tmux_name:
+    # Read stdin (hook input)
+    try:
+        hook_input = json.load(sys.stdin)
+    except Exception:
+        hook_input = {}
+    log(f"--- Hook called. cwd={hook_input.get('cwd', '?')}, tool={hook_input.get('tool_name', '?')}")
+
+    session_id = get_cc_session_id()
+    if not session_id:
+        log("No cc- session found, exiting")
         return
 
-    session_id = tmux_name.removeprefix("cc-")
+    log(f"Session ID: {session_id}")
 
     script_dir = Path(__file__).resolve().parent
     env = load_env(script_dir)
     port = env.get("PORT", "3100")
     token = env.get("NTFY_AUTH_TOKEN", "")
 
-    if check_rocket_mode(port, session_id, token):
+    if not check_rocket_mode(port, session_id, token):
+        log("Rocket mode OFF")
+        return
+
+    # Never auto-approve AskUserQuestion — the user needs to see and answer it
+    tool_name = hook_input.get("tool_name", "")
+    if tool_name == "AskUserQuestion":
+        log("Rocket mode ON but skipping AskUserQuestion")
+        return
+
+    event = hook_input.get("hook_event_name", "PreToolUse")
+    log(f"Rocket mode ON — approving ({event})")
+
+    if event == "PermissionRequest":
         json.dump({
             "hookSpecificOutput": {
+                "hookEventName": "PermissionRequest",
+                "decision": {"behavior": "allow"},
+            }
+        }, sys.stdout)
+    else:
+        json.dump({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
                 "permissionDecision": "allow",
                 "permissionDecisionReason": "Rocket mode enabled",
             }
