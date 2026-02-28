@@ -39,7 +39,8 @@ if [[ -f "$CLAUDE_JSON" ]]; then
     const fs = require('fs');
     const config = JSON.parse(fs.readFileSync('$CLAUDE_JSON', 'utf-8'));
     if (!config.mcpServers) config.mcpServers = {};
-    config.mcpServers['command-center'] = {
+    delete config.mcpServers['command-center'];
+    config.mcpServers['notifications'] = {
       type: 'stdio',
       command: 'node',
       args: ['$MCP_BUILD'],

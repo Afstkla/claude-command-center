@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { notifyUser, askUser } from './tools.js';
 
 const server = new McpServer({
-  name: 'command-center',
+  name: 'notifications',
   version: '1.0.0',
 });
 
