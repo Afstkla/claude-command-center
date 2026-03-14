@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SessionCard } from '../components/SessionCard';
 import { NewSessionDialog } from '../components/NewSessionDialog';
 
@@ -16,6 +17,7 @@ interface Session {
 }
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -24,6 +26,7 @@ export function Dashboard() {
   const fetchSessions = useCallback(async () => {
     try {
       const res = await fetch('/api/sessions', { signal: AbortSignal.timeout(10_000) });
+      if (res.status === 401) { navigate('/login'); return; }
       if (res.ok) {
         setSessions(await res.json());
         failCount.current = 0;

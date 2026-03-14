@@ -9,7 +9,7 @@ import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 import { login, authMiddleware, COOKIE_NAME, MAX_AGE_HOURS } from './auth.js';
 import { createSession, listSessions, killSession, refreshSession, getSession } from './sessions.js';
-import { getSession as getSessionFromDb, setRocketMode } from './db.js';
+import { getSession as getSessionFromDb, setRocketMode, renameSession } from './db.js';
 import { syncSessionsWithTmux } from './sessions.js';
 import { setupTerminalWs, handleTerminalSSE, handleTerminalInput } from './terminal.js';
 import { sendInput } from './input.js';
@@ -235,7 +235,7 @@ app.get('/api/sessions/:id', (req, res) => {
 });
 
 app.post('/api/sessions', (req, res) => {
-  const { name, cwd, command, worktreePath, initialPrompt, repo } = req.body;
+  const { name, cwd, command, worktreePath, initialPrompt, repo, rocketMode } = req.body;
 
   if (!name || !cwd) {
     res.status(400).json({ error: 'name and cwd are required' });
@@ -244,7 +244,8 @@ app.post('/api/sessions', (req, res) => {
 
   try {
     const session = createSession(name, cwd, command, { worktreePath, initialPrompt, repo });
-    res.status(201).json(session);
+    if (rocketMode) setRocketMode(session.id, true);
+    res.status(201).json({ ...session, rocket_mode: rocketMode ? 1 : 0 });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -265,6 +266,21 @@ app.post('/api/sessions/:id/refresh', (req, res) => {
     res.status(404).json({ error: 'Session not found or dead' });
     return;
   }
+  res.json({ ok: true });
+});
+
+app.patch('/api/sessions/:id/name', (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== 'string') {
+    res.status(400).json({ error: 'Name is required' });
+    return;
+  }
+  const session = getSessionFromDb(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+  renameSession(req.params.id, name.trim());
   res.json({ ok: true });
 });
 

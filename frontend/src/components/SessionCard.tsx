@@ -32,12 +32,42 @@ export function SessionCard({ session, onKill, onRefresh, onQuickAction }: Props
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customText, setCustomText] = useState('');
   const [confirmKill, setConfirmKill] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(session.name);
+
+  const submitRename = () => {
+    const trimmed = editName.trim();
+    if (trimmed && trimmed !== session.name) {
+      fetch(`/api/sessions/${session.id}/name`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      session.name = trimmed;
+    }
+    setEditing(false);
+  };
 
   return (
     <div className="session-card" onClick={() => navigate(`/session/${session.id}`)}>
       <div className="session-card-header">
         <span className="status-dot" style={{ backgroundColor: color }} />
-        <h3>{session.name}</h3>
+        {editing ? (
+          <input
+            className="rename-input"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onBlur={submitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submitRename();
+              if (e.key === 'Escape') { setEditName(session.name); setEditing(false); }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            autoFocus
+          />
+        ) : (
+          <h3 onDoubleClick={(e) => { e.stopPropagation(); setEditing(true); }}>{session.name}</h3>
+        )}
       </div>
       {session.pane_title && (
         <p className="session-pane-title">{session.pane_title}</p>

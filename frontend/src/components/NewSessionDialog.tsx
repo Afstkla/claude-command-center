@@ -21,6 +21,7 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
   const [name, setName] = useState('');
   const [nameManual, setNameManual] = useState(false);
   const [payload, setPayload] = useState<TemplatePayload>({ cwd: '~', command: 'claude' });
+  const [rocketMode, setRocketMode] = useState(false);
   const [error, setError] = useState('');
 
   const handlePayloadChange = useCallback((p: TemplatePayload) => {
@@ -45,6 +46,7 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
         worktreePath: payload.worktreePath,
         initialPrompt: payload.initialPrompt,
         repo: payload.repo,
+        rocketMode,
       }),
     });
 
@@ -98,16 +100,27 @@ export function NewSessionDialog({ onClose, onCreated }: Props) {
 
         <label>
           Name
-          <input
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setNameManual(true);
-            }}
-            placeholder="my-project"
-            required
-            autoFocus={template === 'directory'}
-          />
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <input
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameManual(true);
+              }}
+              placeholder="my-project"
+              required
+              autoFocus={template === 'directory'}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className={`rocket-btn${rocketMode ? ' rocket-btn--active' : ''}`}
+              title={rocketMode ? 'Rocket mode ON' : 'Rocket mode OFF'}
+              onClick={() => setRocketMode(!rocketMode)}
+            >
+              🚀
+            </button>
+          </div>
         </label>
 
         {error && <p className="error">{error}</p>}

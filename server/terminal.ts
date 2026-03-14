@@ -4,9 +4,18 @@ import * as pty from 'node-pty';
 import type { Server } from 'http';
 import type { Request, Response } from 'express';
 import { verifyWsAuth } from './auth.js';
-import { getSession } from './db.js';
+import { getSession, touchSession } from './db.js';
 
 const TMUX_PREFIX = 'cc-';
+const TOUCH_INTERVAL = 30_000; // Throttle last_activity updates to once per 30s
+const lastTouched = new Map<string, number>();
+
+function throttledTouch(sessionId: string) {
+  const now = Date.now();
+  if (now - (lastTouched.get(sessionId) || 0) < TOUCH_INTERVAL) return;
+  lastTouched.set(sessionId, now);
+  touchSession(sessionId);
+}
 const WS_PING_INTERVAL = 15_000; // Ping every 15s
 const WS_PONG_TIMEOUT = 10_000;  // Consider dead if no pong within 10s
 const SSE_KEEPALIVE_INTERVAL = 15_000; // SSE comment every 15s
@@ -85,6 +94,7 @@ function handleWsConnection(ws: WebSocket, sessionId: string) {
     return;
   }
 
+  throttledTouch(sessionId);
   let bytesSent = 0;
   let alive = true;
 
@@ -123,6 +133,7 @@ function handleWsConnection(ws: WebSocket, sessionId: string) {
       const msg: TerminalMessage = JSON.parse(raw.toString());
       if (msg.type === 'data' && msg.data) {
         term.write(msg.data);
+        throttledTouch(sessionId);
       } else if (msg.type === 'resize' && msg.cols && msg.rows) {
         term.resize(msg.cols, msg.rows);
       } else if (msg.type === 'scroll' && msg.lines) {

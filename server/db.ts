@@ -59,6 +59,12 @@ const stmts = {
   setRocketMode: db.prepare(
     'UPDATE sessions SET rocket_mode = ? WHERE id = ?'
   ),
+  rename: db.prepare(
+    'UPDATE sessions SET name = ? WHERE id = ?'
+  ),
+  touch: db.prepare(
+    `UPDATE sessions SET last_activity = datetime('now') WHERE id = ?`
+  ),
 };
 
 export function insertSession(id: string, name: string, cwd: string) {
@@ -91,6 +97,14 @@ export function setSessionMeta(id: string, worktreePath?: string, repo?: string)
 
 export function setRocketMode(id: string, enabled: boolean) {
   stmts.setRocketMode.run(enabled ? 1 : 0, id);
+}
+
+export function renameSession(id: string, name: string) {
+  stmts.rename.run(name, id);
+}
+
+export function touchSession(id: string) {
+  stmts.touch.run(id);
 }
 
 export default db;

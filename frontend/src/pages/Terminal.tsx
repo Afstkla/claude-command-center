@@ -7,6 +7,14 @@ import { MobileToolbar } from '../components/MobileToolbar';
 import { RocketToggle } from '../components/RocketToggle';
 import '@xterm/xterm/css/xterm.css';
 
+const STATUS_COLORS: Record<string, string> = {
+  running: '#4caf50',
+  idle: '#2196f3',
+  waiting: '#ff9800',
+  starting: '#9e9e9e',
+  dead: '#f44336',
+};
+
 const WS_TIMEOUT = 5000; // Fallback to SSE after 5s
 const RECONNECT_BASE = 1000;
 const RECONNECT_MAX = 30_000; // Cap at 30s
@@ -22,6 +30,7 @@ export function Terminal() {
   const [status, setStatus] = useState('Connecting...');
   const [sessionName, setSessionName] = useState('');
   const [rocketMode, setRocketMode] = useState(false);
+  const [sessions, setSessions] = useState<{ id: string; name: string; status: string; last_activity: string }[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -32,6 +41,21 @@ export function Terminal() {
         if (s) setRocketMode(!!s.rocket_mode);
       });
   }, [id]);
+
+  useEffect(() => {
+    const load = () => fetch('/api/sessions').then((r) => {
+      if (r.status === 401) { navigate('/login'); return []; }
+      return r.ok ? r.json() : [];
+    }).then(setSessions);
+    load();
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    document.title = sessionName ? `${sessionName} | Command Center` : 'Command Center';
+    return () => { document.title = 'Command Center'; };
+  }, [sessionName]);
 
   const sendInput = useCallback((data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -195,7 +219,7 @@ export function Terminal() {
     <div className="terminal-page">
       <div className="terminal-header">
         <button onClick={() => navigate('/')}>Back</button>
-        <span>{sessionName ? `${sessionName} (${id})` : id}</span>
+        <EditableName sessionId={id!} initialName={sessionName} />
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {status && <span style={{ color: '#ff9800' }}>{status}</span>}
           {id && (
@@ -210,9 +234,66 @@ export function Terminal() {
           {id && <RocketToggle sessionId={id} initial={rocketMode} />}
         </span>
       </div>
+      <div className="session-tabs">
+        {[...sessions].filter((s) => s.status !== 'dead').sort((a, b) => {
+          if (a.id === id) return -1;
+          if (b.id === id) return 1;
+          return b.last_activity.localeCompare(a.last_activity);
+        }).map((s) => (
+          <button
+            key={s.id}
+            className={`session-tab${s.id === id ? ' session-tab--active' : ''}`}
+            onClick={() => navigate(`/session/${s.id}`)}
+          >
+            <span className="tab-dot" style={{ backgroundColor: STATUS_COLORS[s.status] || '#9e9e9e' }} />
+            {s.name}
+          </button>
+        ))}
+      </div>
       <div ref={termRef} className="terminal-container" />
       <MobileToolbar onSend={sendInput} onRefresh={refresh} />
     </div>
+  );
+}
+
+function EditableName({ sessionId, initialName }: { sessionId: string; initialName: string }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(initialName);
+
+  useEffect(() => { setName(initialName); }, [initialName]);
+
+  const submit = () => {
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== initialName) {
+      fetch(`/api/sessions/${sessionId}/name`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        className="rename-input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={submit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submit();
+          if (e.key === 'Escape') { setName(initialName); setEditing(false); }
+        }}
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <span onDoubleClick={() => setEditing(true)} style={{ cursor: 'pointer' }}>
+      {name ? `${name} (${sessionId})` : sessionId}
+    </span>
   );
 }
 
