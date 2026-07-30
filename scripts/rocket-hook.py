@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -58,18 +59,43 @@ def load_env(script_dir: Path) -> dict[str, str]:
     return env
 
 
+CACHE_FILE = Path("/tmp/rocket-mode-cache.json")
+CACHE_TTL = 10  # seconds
+
+
 def check_rocket_mode(port: str, session_id: str, token: str) -> bool:
-    """Check if rocket mode is enabled for this session."""
+    """Check if rocket mode is enabled for this session, with file-based cache."""
+    # Check cache first
+    try:
+        if CACHE_FILE.exists():
+            cache = json.loads(CACHE_FILE.read_text())
+            entry = cache.get(session_id)
+            if entry and (time.time() - entry["ts"]) < CACHE_TTL:
+                log(f"Cache hit for {session_id}: {entry['v']}")
+                return entry["v"]
+    except Exception:
+        pass
+
     url = f"http://localhost:{port}/api/sessions/{session_id}/rocket?token={token}"
     try:
         req = Request(url, method="GET")
-        resp = urlopen(req, timeout=3)
+        resp = urlopen(req, timeout=5)
         data = json.loads(resp.read())
         log(f"API response for {session_id}: {data}")
-        return data.get("rocket_mode", False)
+        result = data.get("rocket_mode", False)
     except Exception as e:
         log(f"API error: {e}")
         return False
+
+    # Update cache
+    try:
+        cache = json.loads(CACHE_FILE.read_text()) if CACHE_FILE.exists() else {}
+        cache[session_id] = {"v": result, "ts": time.time()}
+        CACHE_FILE.write_text(json.dumps(cache))
+    except Exception:
+        pass
+
+    return result
 
 
 def main():
