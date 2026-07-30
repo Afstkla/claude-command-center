@@ -1,4 +1,6 @@
 import 'dotenv/config';
+// pm2 injects a lowercase `env` var (a JSON dump of the env) that leaks into spawned shells. Drop it.
+delete process.env.env;
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';

@@ -1,4 +1,6 @@
 import { execSync, execFileSync, exec } from 'child_process';
+import { mkdirSync } from 'fs';
+import { homedir } from 'os';
 import { basename, dirname, join } from 'path';
 import { nanoid } from 'nanoid';
 import {
@@ -52,11 +54,14 @@ export function createSession(
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_ENTRYPOINT;
 
+  const resolvedCwd = cwd.startsWith('~') ? join(homedir(), cwd.slice(1)) : cwd;
+  mkdirSync(resolvedCwd, { recursive: true });
+
   execFileSync('tmux', [
     'new-session',
     '-d',
     '-s', tmuxName,
-    '-c', cwd,
+    '-c', resolvedCwd,
   ], { env });
 
   // Send the command inside the shell so the tmux session survives if the command exits
