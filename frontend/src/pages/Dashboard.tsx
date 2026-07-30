@@ -64,20 +64,43 @@ export function Dashboard() {
     await fetch(`/api/sessions/${id}/refresh`, { method: 'POST' });
   }
 
-  const { grouped, ungrouped } = useMemo(() => {
-    const grouped = new Map<string, Session[]>();
-    const ungrouped: Session[] = [];
-    for (const s of sessions) {
+  const { sections, dead } = useMemo(() => {
+    const alive: Session[] = [];
+    const dead: Session[] = [];
+    for (const s of sessions) (s.status === 'dead' ? dead : alive).push(s);
+
+    const repoGroups = new Map<string, Session[]>();
+    const other: Session[] = [];
+    for (const s of alive) {
       if (s.repo) {
-        const list = grouped.get(s.repo) || [];
+        const list = repoGroups.get(s.repo) || [];
         list.push(s);
-        grouped.set(s.repo, list);
+        repoGroups.set(s.repo, list);
       } else {
-        ungrouped.push(s);
+        other.push(s);
       }
     }
-    return { grouped, ungrouped };
+
+    const sections: { key: string; label: string; sessions: Session[] }[] = [];
+    if (other.length) sections.push({ key: 'other', label: 'Other', sessions: other });
+    for (const [repo, sess] of repoGroups) sections.push({ key: `repo:${repo}`, label: repo, sessions: sess });
+    return { sections, dead };
   }, [sessions]);
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('dashboard-collapsed') || '{}'); }
+    catch { return {}; }
+  });
+
+  const isCollapsed = (key: string) => !!collapsed[key];
+
+  const toggleSection = (key: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('dashboard-collapsed', JSON.stringify(next));
+      return next;
+    });
+  };
 
   async function handleQuickAction(id: string, text: string) {
     await fetch(`/api/sessions/${id}/input`, {
@@ -107,25 +130,36 @@ export function Dashboard() {
         <p className="empty">No sessions. Create one to get started.</p>
       )}
 
-      {ungrouped.length > 0 && (
-        <div className="session-grid">
-          {ungrouped.map((s) => (
-            <SessionCard
-              key={s.id}
-              session={s}
-              onKill={() => handleKill(s.id)}
-              onRefresh={() => handleRefresh(s.id)}
-              onQuickAction={(text) => handleQuickAction(s.id, text)}
-            />
-          ))}
-        </div>
-      )}
+      {sections.map((sec) => {
+        const collapsed = isCollapsed(sec.key);
+        return (
+          <div key={sec.key} className="repo-group">
+            <h2 className="repo-group-header repo-group-header--toggle" onClick={() => toggleSection(sec.key)}>
+              <span className="group-toggle">{collapsed ? '▸' : '▾'}</span>
+              {sec.label} <span className="group-count">({sec.sessions.length})</span>
+            </h2>
+            {!collapsed && (
+              <div className="session-grid">
+                {sec.sessions.map((s) => (
+                  <SessionCard
+                    key={s.id}
+                    session={s}
+                    onKill={() => handleKill(s.id)}
+                    onRefresh={() => handleRefresh(s.id)}
+                    onQuickAction={(text) => handleQuickAction(s.id, text)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
-      {[...grouped.entries()].map(([repo, repoSessions]) => (
-        <div key={repo} className="repo-group">
-          <h2 className="repo-group-header">{repo}</h2>
+      {dead.length > 0 && (
+        <details className="dead-sessions">
+          <summary>{dead.length} dead session{dead.length === 1 ? '' : 's'}</summary>
           <div className="session-grid">
-            {repoSessions.map((s) => (
+            {dead.map((s) => (
               <SessionCard
                 key={s.id}
                 session={s}
@@ -135,8 +169,8 @@ export function Dashboard() {
               />
             ))}
           </div>
-        </div>
-      ))}
+        </details>
+      )}
 
       {showNew && (
         <NewSessionDialog

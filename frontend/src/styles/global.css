@@ -134,6 +134,51 @@ textarea:focus {
   border-bottom: 1px solid var(--border);
 }
 
+.repo-group-header--toggle {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.repo-group-header--toggle:hover {
+  color: var(--text);
+}
+
+.group-toggle {
+  display: inline-block;
+  width: 0.8rem;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.group-count {
+  font-weight: 400;
+  opacity: 0.65;
+}
+
+.dead-sessions {
+  margin-top: 2rem;
+}
+
+.dead-sessions > summary {
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  opacity: 0.6;
+  padding: 0.4rem 0;
+}
+
+.dead-sessions > summary:hover {
+  opacity: 1;
+}
+
+.dead-sessions[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
 /* Session Card */
 
 .session-card {
@@ -595,6 +640,104 @@ textarea:focus {
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* Split pane layout */
+
+.terminal-panes {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Grid layout is set inline via style attribute based on pane count */
+
+.terminal-pane {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.terminal-pane-content {
+  position: absolute;
+  inset: 4px;
+}
+
+.terminal-pane-content .xterm {
+  height: 100%;
+}
+
+.pane-close-btn {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 10;
+  background: rgba(26, 26, 46, 0.8);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pane-close-btn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Pane picker dropdown */
+
+.pane-picker {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem;
+  min-width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.pane-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.pane-picker-item:hover {
+  background: var(--border);
+}
+
+.pane-picker-empty {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* Legacy single-pane (keep for SSE fallback) */
 
 .terminal-container {
   flex: 1;
