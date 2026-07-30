@@ -7,3 +7,4 @@ frontend/dist/
 *.tsbuildinfo
 .env
 mcp-server/build/
+logs/
